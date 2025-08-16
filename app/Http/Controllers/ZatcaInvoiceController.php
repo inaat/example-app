@@ -146,7 +146,7 @@ class ZatcaInvoiceController extends Controller
             $builder->setCurrencyCodes($invoice->currency);
             
             // Add ICV and PIH references
-            $builder->addAdditionalDocumentReference('ICV', null, (string)$invoice->icv);
+            $builder->addAdditionalDocumentReference('ICV', (string)$invoice->icv);
             $builder->addAdditionalDocumentReference('PIH', null, $invoice->previous_invoice_hash);
             
             // Add QR code placeholder
@@ -172,28 +172,23 @@ class ZatcaInvoiceController extends Controller
                 $sellerAddress
             );
 
-            // Set customer party (if not simplified)
-            if (!$isSimplified && $invoice->buyer_info) {
-                $buyerAddress = [
-                    'streetName' => $invoice->buyer_info['address'] ?? 'N/A',
-                    'buildingNumber' => '0000',
-                    'citySubdivisionName' => 'N/A',
-                    'cityName' => 'Riyadh',
-                    'postalZone' => '00000',
-                    'countryCode' => 'SA'
-                ];
-                
-                $builder->setCustomerParty(
-                    null,
-                    $invoice->buyer_info['vat_number'] ?? null,
-                    $invoice->buyer_info['name'],
-                    $buyerAddress
-                );
-            }
-
-            // Set delivery
-            $builder->setDelivery($invoice->issue_date->format('Y-m-d'));
+            // Set customer party - required for all invoice types
+            $buyerAddress = [
+                'streetName' => $invoice->buyer_info['address'] ?? 'صلاح الدين | Salah Al-Din',
+                'buildingNumber' => '1111',
+                'citySubdivisionName' => 'المروج | Al-Murooj',
+                'cityName' => 'الرياض | Riyadh',
+                'postalZone' => '12222',
+                'countryCode' => 'SA'
+            ];
             
+            $builder->setCustomerParty(
+                null,
+                $invoice->buyer_info['vat_number'] ?? '399999999800003',
+                $invoice->buyer_info['name'] ?? 'شركة نماذج فاتورة المحدودة | Fatoora Samples LTD',
+                $buyerAddress
+            );
+
             // Set payment means
             $builder->setPaymentMeans('10');
             
@@ -344,6 +339,7 @@ public function submitToZatca(ZatcaInvoice $invoice)
         // Prepare the signed invoice as JSON payload
         $jsonPayload = json_encode([
             'invoiceHash' => $invoice->current_hash,
+            'uuid' => $invoice->uuid,
             'invoice' => base64_encode($invoice->signed_xml)
         ]);
 
@@ -473,5 +469,10 @@ public function submitToZatca(ZatcaInvoice $invoice)
         $invoice->delete();
         return redirect()->route('zatca.invoices.index')
                         ->with('success', 'Invoice deleted successfully.');
+    }
+
+    public function print(ZatcaInvoice $invoice)
+    {
+        return view('zatca.invoices.print', compact('invoice'));
     }
 }

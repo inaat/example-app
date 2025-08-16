@@ -36,6 +36,7 @@ Route::prefix('zatca/invoices')->name('zatca.invoices.')->group(function () {
     Route::get('/create', [ZatcaInvoiceController::class, 'create'])->name('create');
     Route::post('/', [ZatcaInvoiceController::class, 'store'])->name('store');
     Route::get('/{invoice}', [ZatcaInvoiceController::class, 'show'])->name('show');
+    Route::get('/{invoice}/print', [ZatcaInvoiceController::class, 'print'])->name('print');
     Route::post('/{invoice}/generate-xml', [ZatcaInvoiceController::class, 'generateXML'])->name('generate-xml');
     Route::post('/{invoice}/sign', [ZatcaInvoiceController::class, 'signInvoice'])->name('sign');
     Route::post('/{invoice}/submit', [ZatcaInvoiceController::class, 'submitToZatca'])->name('submit');

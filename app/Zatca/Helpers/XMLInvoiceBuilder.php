@@ -296,8 +296,18 @@ class XMLInvoiceBuilder {
     }
     
     public function setDelivery($actualDeliveryDate) {
-        $delivery = $this->addElement('cac:Delivery');
+        // Create delivery element
+        $delivery = $this->dom->createElement('cac:Delivery');
         $delivery->appendChild($this->dom->createElement('cbc:ActualDeliveryDate', $actualDeliveryDate));
+        
+        // Find AccountingCustomerParty and insert Delivery after it
+        $customerParty = $this->xpath->query('//cac:AccountingCustomerParty')->item(0);
+        if ($customerParty && $customerParty->nextSibling) {
+            $this->invoice->insertBefore($delivery, $customerParty->nextSibling);
+        } else {
+            // If no next sibling, just append
+            $this->invoice->appendChild($delivery);
+        }
         return $this;
     }
     

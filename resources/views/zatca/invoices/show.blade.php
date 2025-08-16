@@ -296,10 +296,17 @@
                 </div>
                 <div class="card-body text-center">
                     <div class="bg-light p-3 rounded">
-                        <i class="fas fa-qrcode fa-3x text-muted"></i><br>
-                        <small class="text-muted">QR Code Generated</small>
+                        <img src="data:image/png;base64,{{ app('DNS2D')->getBarcodePNG($invoice->qr_code, 'QRCODE', 4, 4) }}" 
+                             alt="QR Code" 
+                             style="width: 150px; height: 150px;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div style="display: none;">
+                            <i class="fas fa-qrcode fa-3x text-muted"></i><br>
+                            <small class="text-muted">QR Code Error</small>
+                        </div>
                     </div>
                     <small class="text-muted d-block mt-2">Base64: {{ Str::limit($invoice->qr_code, 20) }}...</small>
+                    <p class="text-muted mt-2 mb-0"><small>Scan to verify invoice authenticity</small></p>
                 </div>
             </div>
         @endif
@@ -312,6 +319,10 @@
             <div class="card-body">
                 <a href="{{ route('zatca.invoices.index') }}" class="btn btn-outline-secondary w-100 mb-2">
                     <i class="fas fa-arrow-left me-2"></i>Back to Invoices
+                </a>
+                
+                <a href="{{ route('zatca.invoices.print', $invoice) }}" target="_blank" class="btn btn-outline-primary w-100 mb-2">
+                    <i class="fas fa-print me-2"></i>Print Invoice
                 </a>
                 
                 @if($invoice->isPending())

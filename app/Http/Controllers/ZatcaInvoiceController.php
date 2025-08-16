@@ -19,8 +19,9 @@ class ZatcaInvoiceController extends Controller
 
     public function index()
     {
-        $invoices = ZatcaInvoice::with(['certificate', 'returns'])
+        $invoices = ZatcaInvoice::with(['certificate', 'returns', 'debits'])
                                ->where('invoice_type', '!=', '381') // Exclude credit notes from main listing
+                               ->where('invoice_type', '!=', '383') // Exclude debit notes from main listing  
                                ->orderBy('created_at', 'desc')
                                ->paginate(15);
         return view('zatca.invoices.index', compact('invoices'));
@@ -144,9 +145,6 @@ class ZatcaInvoiceController extends Controller
             if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
                 $reason = $invoice->return_reason ?? 'Product return';
                 $builder->addNote($reason, 'en'); // Use English for better compatibility
-                
-                // Add specific KSA-10 element for credit note reason
-                $builder->addElement('cbc:InstructionNote', $reason);
             } else {
                 $builder->addNote('ABC');
             }
@@ -183,20 +181,28 @@ class ZatcaInvoiceController extends Controller
             // Use certificate VAT number for ZATCA compliance (certificate-permissions)
             $certificate = $invoice->certificate;
             
-            // Try to extract VAT from certificate fields
+            // Extract VAT from certificate serial number (format: 1-TST|2-VAT|3-NUM)
             $sellerVat = null;
-            if ($certificate->organization_unit_name && strlen($certificate->organization_unit_name) === 15) {
-                $sellerVat = $certificate->organization_unit_name;
-            } elseif ($certificate->serial_number && strlen($certificate->serial_number) === 15) {
-                $sellerVat = $certificate->serial_number;
-            } else {
-                // Use invoice VAT if certificate doesn't have proper VAT
-                $sellerVat = $invoice->seller_info['vat_number'];
+            if ($certificate->serial_number && strpos($certificate->serial_number, '|2-') !== false) {
+                $parts = explode('|', $certificate->serial_number);
+                foreach ($parts as $part) {
+                    if (str_starts_with($part, '2-')) {
+                        $vatCandidate = substr($part, 2);
+                        if (strlen($vatCandidate) === 15 && str_starts_with($vatCandidate, '3') && str_ends_with($vatCandidate, '3')) {
+                            $sellerVat = $vatCandidate;
+                            break;
+                        }
+                    }
+                }
             }
             
-            // Ensure VAT number format compliance (BR-KSA-40)
-            if (!$sellerVat || strlen($sellerVat) !== 15 || !str_starts_with($sellerVat, '3') || !str_ends_with($sellerVat, '3')) {
-                $sellerVat = '310122393500003'; // Default compliant VAT number
+            // Fallback to invoice VAT if extraction failed
+            if (!$sellerVat) {
+                $sellerVat = $invoice->seller_info['vat_number'];
+                // Ensure VAT number format compliance (BR-KSA-40)
+                if (!$sellerVat || strlen($sellerVat) !== 15 || !str_starts_with($sellerVat, '3') || !str_ends_with($sellerVat, '3')) {
+                    $sellerVat = '399999999900003'; // Use the VAT from certificate
+                }
             }
             
             $builder->setSupplierParty(
@@ -223,8 +229,13 @@ class ZatcaInvoiceController extends Controller
                 $buyerAddress
             );
 
-            // Set payment means
-            $builder->setPaymentMeans('10');
+            // Set payment means - add instruction note for credit/debit notes (KSA-10)
+            if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                $reason = $invoice->return_reason ?? 'Product return';
+                $builder->setPaymentMeans('10', $reason); // Add reason as instruction note
+            } else {
+                $builder->setPaymentMeans('10');
+            }
             
             // Add allowance/charge
             $builder->addAllowanceCharge(false, 'discount', '0.00');

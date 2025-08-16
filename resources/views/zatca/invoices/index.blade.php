@@ -11,6 +11,9 @@
         <a href="{{ route('zatca.returns.create') }}" class="btn btn-outline-warning">
             <i class="fas fa-undo me-2"></i>Create Return
         </a>
+        <a href="{{ route('zatca.debits.create') }}" class="btn btn-outline-success">
+            <i class="fas fa-plus-circle me-2"></i>Create Debit Note
+        </a>
     </div>
 @endsection
 
@@ -38,6 +41,11 @@
                                 @if($invoice->hasReturns())
                                     <span class="badge bg-warning ms-1" title="Has returns">
                                         <i class="fas fa-undo"></i> {{ $invoice->returns->count() }}
+                                    </span>
+                                @endif
+                                @if($invoice->hasDebits())
+                                    <span class="badge bg-success ms-1" title="Has additional charges">
+                                        <i class="fas fa-plus-circle"></i> {{ $invoice->debits->count() }}
                                     </span>
                                 @endif
                                 <br>
@@ -86,6 +94,10 @@
                                         <a href="{{ route('zatca.returns.create-from', $invoice) }}" 
                                            class="btn btn-sm btn-outline-warning" title="Create Return">
                                             <i class="fas fa-undo"></i>
+                                        </a>
+                                        <a href="{{ route('zatca.debits.create-from', $invoice) }}" 
+                                           class="btn btn-sm btn-outline-success" title="Create Debit Note">
+                                            <i class="fas fa-plus-circle"></i>
                                         </a>
                                     @endif
                                     

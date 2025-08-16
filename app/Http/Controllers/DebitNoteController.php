@@ -8,16 +8,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
-class ReturnInvoiceController extends Controller
+class DebitNoteController extends Controller
 {
     public function index()
     {
-        $returnInvoices = ZatcaInvoice::where('invoice_type', '381')
+        $debitNotes = ZatcaInvoice::where('invoice_type', '383')
             ->with('certificate')
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        return view('zatca.returns.index', compact('returnInvoices'));
+        return view('zatca.debits.index', compact('debitNotes'));
     }
 
     public function create(Request $request)
@@ -25,12 +25,12 @@ class ReturnInvoiceController extends Controller
         $certificates = CertificateInfo::where('status', 'active')->get();
         $originalInvoice = null;
 
-        // If returning from a specific invoice
+        // If creating debit note from a specific invoice
         if ($request->has('original_invoice_id')) {
             $originalInvoice = ZatcaInvoice::find($request->original_invoice_id);
         }
 
-        return view('zatca.returns.create', compact('certificates', 'originalInvoice'));
+        return view('zatca.debits.create', compact('certificates', 'originalInvoice'));
     }
 
     public function store(Request $request)
@@ -39,7 +39,7 @@ class ReturnInvoiceController extends Controller
             'certificate_info_id' => 'required|exists:certificate_infos,id',
             'original_invoice_id' => 'nullable|exists:zatca_invoices,id',
             'original_invoice_number' => 'required|string',
-            'return_reason' => 'required|string',
+            'debit_reason' => 'required|string',
             'invoice_subtype' => 'required|in:01,02',
             'issue_date' => 'required|date',
             'issue_time' => 'required|string',
@@ -50,9 +50,9 @@ class ReturnInvoiceController extends Controller
             'line_items.*.quantity' => 'required|numeric|min:0.01',
             'line_items.*.unit_price' => 'required|numeric|min:0.01',
             'line_items.*.tax_rate' => 'required|numeric|min:0|max:100',
-            'return_type' => 'required|in:full,partial',
+            'debit_type' => 'required|in:additional_charges,price_correction,extra_services',
         ]);
-        
+
         // Set default currency if not provided
         if (empty($validated['currency'])) {
             $validated['currency'] = 'SAR';
@@ -61,12 +61,12 @@ class ReturnInvoiceController extends Controller
         try {
             $certificate = CertificateInfo::findOrFail($validated['certificate_info_id']);
             
-            // Generate invoice number for credit note
-            $invoiceNumber = 'CN-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+            // Generate invoice number for debit note
+            $invoiceNumber = 'DN-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
             
-            // Process line items for returns (negative amounts)
-            $processedItems = $this->processReturnItems($validated['line_items']);
-            $totals = $this->calculateReturnTotals($processedItems);
+            // Process line items for debit notes (positive amounts)
+            $processedItems = $this->processDebitItems($validated['line_items']);
+            $totals = $this->calculateDebitTotals($processedItems);
 
             // Extract VAT from certificate serial number (format: 1-TST|2-VAT|3-NUM)
             $sellerVat = null;
@@ -94,12 +94,12 @@ class ReturnInvoiceController extends Controller
                 'address' => 'Riyadh, Saudi Arabia'
             ];
 
-            // Create return invoice (credit note)
-            $returnInvoice = ZatcaInvoice::create([
+            // Create debit note
+            $debitNote = ZatcaInvoice::create([
                 'certificate_info_id' => $validated['certificate_info_id'],
                 'invoice_number' => $invoiceNumber,
                 'uuid' => Str::uuid()->toString(),
-                'invoice_type' => '381', // Credit Note
+                'invoice_type' => '383', // Debit Note
                 'invoice_subtype' => $validated['invoice_subtype'],
                 'issue_date' => Carbon::parse($validated['issue_date']),
                 'issue_time' => $validated['issue_time'],
@@ -114,81 +114,81 @@ class ReturnInvoiceController extends Controller
                 'line_items' => $processedItems,
                 'tax_breakdown' => $this->generateTaxBreakdown($processedItems),
                 'zatca_status' => 'pending',
-                // Return-specific fields
-                'return_reason' => $validated['return_reason'],
+                // Debit-specific fields
+                'debit_reason' => $validated['debit_reason'],
                 'original_invoice_number' => $validated['original_invoice_number'],
-                'return_type' => $validated['return_type'],
+                'debit_type' => $validated['debit_type'],
             ]);
 
             // Link to original invoice if provided
             if ($validated['original_invoice_id']) {
                 $originalInvoice = ZatcaInvoice::find($validated['original_invoice_id']);
                 if ($originalInvoice) {
-                    $returnInvoice->update([
+                    $debitNote->update([
                         'original_invoice_id' => $originalInvoice->id,
                         'buyer_info' => $originalInvoice->buyer_info,
                     ]);
                 }
             }
 
-            return redirect()->route('zatca.returns.show', $returnInvoice)
-                ->with('success', 'Return invoice (Credit Note) created successfully.');
+            return redirect()->route('zatca.debits.show', $debitNote)
+                ->with('success', 'Debit Note created successfully.');
 
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Error creating return invoice: ' . $e->getMessage());
+                ->with('error', 'Error creating debit note: ' . $e->getMessage());
         }
     }
 
-    public function show(ZatcaInvoice $returnInvoice)
+    public function show(ZatcaInvoice $debitNote)
     {
-        // Ensure this is a credit note
-        if ($returnInvoice->invoice_type !== '381') {
-            abort(404, 'Return invoice not found');
+        // Ensure this is a debit note
+        if ($debitNote->invoice_type !== '383') {
+            abort(404, 'Debit note not found');
         }
 
         $originalInvoice = null;
-        if ($returnInvoice->original_invoice_id) {
-            $originalInvoice = ZatcaInvoice::find($returnInvoice->original_invoice_id);
+        if ($debitNote->original_invoice_id) {
+            $originalInvoice = ZatcaInvoice::find($debitNote->original_invoice_id);
         }
 
-        return view('zatca.returns.show', compact('returnInvoice', 'originalInvoice'));
+        return view('zatca.debits.show', compact('debitNote', 'originalInvoice'));
     }
 
     public function createFromInvoice(ZatcaInvoice $invoice)
     {
         $certificates = CertificateInfo::where('status', 'active')->get();
         
-        return view('zatca.returns.create', [
+        return view('zatca.debits.create', [
             'certificates' => $certificates,
             'originalInvoice' => $invoice
         ]);
     }
 
-    public function generateReturnXML(ZatcaInvoice $returnInvoice)
+    public function generateDebitXML(ZatcaInvoice $debitNote)
     {
-        if ($returnInvoice->invoice_type !== '381') {
+        if ($debitNote->invoice_type !== '383') {
             return response()->json([
                 'success' => false,
-                'message' => 'This is not a return invoice'
+                'message' => 'This is not a debit note'
             ], 400);
         }
 
         try {
             // Use the same XML generation logic as regular invoices
             $controller = new ZatcaInvoiceController();
-            return $controller->generateXML($returnInvoice);
+            return $controller->generateXML($debitNote);
             
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error generating return invoice XML: ' . $e->getMessage()
+                'message' => 'Error generating debit note XML: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    public function processReturn(Request $request, ZatcaInvoice $returnInvoice)
+    public function processDebit(Request $request, ZatcaInvoice $debitNote)
     {
         $validated = $request->validate([
             'action' => 'required|in:sign,submit,generate_qr'
@@ -199,11 +199,11 @@ class ReturnInvoiceController extends Controller
             
             switch ($validated['action']) {
                 case 'sign':
-                    return $controller->signInvoice($returnInvoice);
+                    return $controller->signInvoice($debitNote);
                 case 'submit':
-                    return $controller->submitToZatca($returnInvoice);
+                    return $controller->submitToZatca($debitNote);
                 case 'generate_qr':
-                    return $controller->generateQRCode($returnInvoice);
+                    return $controller->generateQRCode($debitNote);
                 default:
                     return response()->json(['success' => false, 'message' => 'Invalid action'], 400);
             }
@@ -211,12 +211,12 @@ class ReturnInvoiceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error processing return: ' . $e->getMessage()
+                'message' => 'Error processing debit note: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    private function processReturnItems($items)
+    private function processDebitItems($items)
     {
         $processedItems = [];
         
@@ -225,40 +225,40 @@ class ReturnInvoiceController extends Controller
             $unitPrice = (float) $item['unit_price'];
             $taxRate = (float) $item['tax_rate'];
             
-            // Calculate amounts (negative for returns)
+            // Calculate amounts (positive for debit notes)
             $lineTotal = $quantity * $unitPrice;
             $taxAmount = ($lineTotal * $taxRate) / 100;
             $totalWithTax = $lineTotal + $taxAmount;
             
             $processedItems[] = [
                 'name' => $item['name'],
-                'quantity' => -$quantity, // Negative quantity for returns
+                'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'tax_rate' => $taxRate,
-                'line_total' => -$lineTotal, // Negative amount
-                'tax_amount' => -$taxAmount, // Negative tax
-                'total_with_tax' => -$totalWithTax, // Negative total with tax
-                'total_amount' => -$totalWithTax, // Negative total (backward compatibility)
+                'line_total' => $lineTotal,
+                'tax_amount' => $taxAmount,
+                'total_with_tax' => $totalWithTax,
+                'total_amount' => $totalWithTax,
             ];
         }
         
         return $processedItems;
     }
 
-    private function calculateReturnTotals($items)
+    private function calculateDebitTotals($items)
     {
         $subtotal = 0;
         $taxAmount = 0;
         
         foreach ($items as $item) {
-            $subtotal += $item['line_total']; // Already negative
-            $taxAmount += $item['tax_amount']; // Already negative
+            $subtotal += $item['line_total'];
+            $taxAmount += $item['tax_amount'];
         }
         
         return [
-            'subtotal' => $subtotal, // Negative value
-            'tax_amount' => $taxAmount, // Negative value
-            'total_amount' => $subtotal + $taxAmount, // Negative total
+            'subtotal' => $subtotal,
+            'tax_amount' => $taxAmount,
+            'total_amount' => $subtotal + $taxAmount,
         ];
     }
 
@@ -304,20 +304,30 @@ class ReturnInvoiceController extends Controller
         ];
     }
 
-    public function destroy(ZatcaInvoice $returnInvoice)
+    public function print(ZatcaInvoice $debitNote)
     {
-        // Ensure this is a credit note and it's still pending
-        if ($returnInvoice->invoice_type !== '381') {
-            return redirect()->back()->with('error', 'Not a valid return invoice.');
+        // Ensure this is a debit note
+        if ($debitNote->invoice_type !== '383') {
+            abort(404, 'Debit note not found');
         }
 
-        if (!$returnInvoice->isPending()) {
-            return redirect()->back()->with('error', 'Cannot delete a processed return invoice.');
+        return view('zatca.debits.print', compact('debitNote'));
+    }
+
+    public function destroy(ZatcaInvoice $debitNote)
+    {
+        // Ensure this is a debit note and it's still pending
+        if ($debitNote->invoice_type !== '383') {
+            return redirect()->back()->with('error', 'Not a valid debit note.');
         }
 
-        $returnInvoice->delete();
+        if (!$debitNote->isPending()) {
+            return redirect()->back()->with('error', 'Cannot delete a processed debit note.');
+        }
 
-        return redirect()->route('zatca.returns.index')
-            ->with('success', 'Return invoice deleted successfully.');
+        $debitNote->delete();
+
+        return redirect()->route('zatca.debits.index')
+            ->with('success', 'Debit note deleted successfully.');
     }
 }

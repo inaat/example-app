@@ -44,6 +44,9 @@ class ZatcaInvoice extends Model
         'original_invoice_id',
         'return_type',
         'return_date',
+        // Debit-specific fields
+        'debit_reason',
+        'debit_type',
     ];
 
     protected $casts = [
@@ -129,6 +132,17 @@ class ZatcaInvoice extends Model
     public function hasReturns(): bool
     {
         return $this->returns()->exists();
+    }
+
+    public function debits()
+    {
+        return $this->hasMany(ZatcaInvoice::class, 'original_invoice_id')
+                    ->where('invoice_type', '383');
+    }
+
+    public function hasDebits(): bool
+    {
+        return $this->debits()->exists();
     }
 
     public function originalInvoice()

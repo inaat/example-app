@@ -56,3 +56,16 @@ Route::prefix('zatca/returns')->name('zatca.returns.')->group(function () {
     Route::post('/{returnInvoice}/process', [ReturnInvoiceController::class, 'processReturn'])->name('process');
     Route::delete('/{returnInvoice}', [ReturnInvoiceController::class, 'destroy'])->name('destroy');
 });
+
+// Debit Notes Routes
+Route::prefix('zatca/debits')->name('zatca.debits.')->group(function () {
+    Route::get('/', [App\Http\Controllers\DebitNoteController::class, 'index'])->name('index');
+    Route::get('/create', [App\Http\Controllers\DebitNoteController::class, 'create'])->name('create');
+    Route::post('/', [App\Http\Controllers\DebitNoteController::class, 'store'])->name('store');
+    Route::get('/{debitNote}', [App\Http\Controllers\DebitNoteController::class, 'show'])->name('show');
+    Route::get('/{debitNote}/print', [App\Http\Controllers\DebitNoteController::class, 'print'])->name('print');
+    Route::get('/create-from/{invoice}', [App\Http\Controllers\DebitNoteController::class, 'createFromInvoice'])->name('create-from');
+    Route::post('/{debitNote}/generate-xml', [App\Http\Controllers\DebitNoteController::class, 'generateDebitXML'])->name('generate-xml');
+    Route::post('/{debitNote}/process', [App\Http\Controllers\DebitNoteController::class, 'processDebit'])->name('process');
+    Route::delete('/{debitNote}', [App\Http\Controllers\DebitNoteController::class, 'destroy'])->name('destroy');
+});

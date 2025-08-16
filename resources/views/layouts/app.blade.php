@@ -58,6 +58,13 @@
                                 Returns
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('zatca.debits.*') ? 'active' : '' }}" 
+                               href="{{ route('zatca.debits.index') }}">
+                                <i class="fas fa-plus-circle me-2"></i>
+                                Debit Notes
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </nav>

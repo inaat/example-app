@@ -89,7 +89,6 @@
                             <select class="form-select @error('invoice_type') is-invalid @enderror" 
                                     id="invoice_type" name="invoice_type" required>
                                 <option value="388" {{ old('invoice_type', '388') == '388' ? 'selected' : '' }}>Standard Invoice (388)</option>
-                                <option value="381" {{ old('invoice_type') == '381' ? 'selected' : '' }}>Credit Note (381)</option>
                                 <option value="383" {{ old('invoice_type') == '383' ? 'selected' : '' }}>Debit Note (383)</option>
                             </select>
                             @error('invoice_type')
@@ -98,8 +97,8 @@
                             <div class="form-text">
                                 <small>
                                     <strong>388:</strong> Regular B2B invoices | 
-                                    <strong>381:</strong> Credit notes (refunds/returns) | 
-                                    <strong>383:</strong> Debit notes (additional charges)
+                                    <strong>383:</strong> Debit notes (additional charges)<br>
+                                    <em>Credit notes (381) for returns are handled via the Returns section</em>
                                 </small>
                             </div>
                         </div>

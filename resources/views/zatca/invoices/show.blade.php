@@ -324,6 +324,12 @@
                 <a href="{{ route('zatca.invoices.print', $invoice) }}" target="_blank" class="btn btn-outline-primary w-100 mb-2">
                     <i class="fas fa-print me-2"></i>Print Invoice
                 </a>
+
+                @if($invoice->zatca_status === 'reported' || $invoice->zatca_status === 'cleared')
+                    <a href="{{ route('zatca.returns.create-from', $invoice) }}" class="btn btn-outline-warning w-100 mb-2">
+                        <i class="fas fa-undo me-2"></i>Create Return
+                    </a>
+                @endif
                 
                 @if($invoice->isPending())
                     <form action="{{ route('zatca.invoices.destroy', $invoice) }}" 

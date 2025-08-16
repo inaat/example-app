@@ -51,6 +51,13 @@
                                 Invoices
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('zatca.returns.*') ? 'active' : '' }}" 
+                               href="{{ route('zatca.returns.index') }}">
+                                <i class="fas fa-undo me-2"></i>
+                                Returns
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </nav>

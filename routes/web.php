@@ -11,6 +11,7 @@ use App\Http\Controllers\TestZatcaOnboardingController;
 
 use App\Http\Controllers\ZatcaOnboardingController;
 use App\Http\Controllers\ZatcaInvoiceController;
+use App\Http\Controllers\ReturnInvoiceController;
 
 Route::get('/', function () {
     return redirect()->route('zatca.onboarding.index');
@@ -42,4 +43,16 @@ Route::prefix('zatca/invoices')->name('zatca.invoices.')->group(function () {
     Route::post('/{invoice}/submit', [ZatcaInvoiceController::class, 'submitToZatca'])->name('submit');
     Route::post('/{invoice}/qr-code', [ZatcaInvoiceController::class, 'generateQRCode'])->name('qr-code');
     Route::delete('/{invoice}', [ZatcaInvoiceController::class, 'destroy'])->name('destroy');
+});
+
+// Return Invoices Routes
+Route::prefix('zatca/returns')->name('zatca.returns.')->group(function () {
+    Route::get('/', [ReturnInvoiceController::class, 'index'])->name('index');
+    Route::get('/create', [ReturnInvoiceController::class, 'create'])->name('create');
+    Route::post('/', [ReturnInvoiceController::class, 'store'])->name('store');
+    Route::get('/{returnInvoice}', [ReturnInvoiceController::class, 'show'])->name('show');
+    Route::get('/create-from/{invoice}', [ReturnInvoiceController::class, 'createFromInvoice'])->name('create-from');
+    Route::post('/{returnInvoice}/generate-xml', [ReturnInvoiceController::class, 'generateReturnXML'])->name('generate-xml');
+    Route::post('/{returnInvoice}/process', [ReturnInvoiceController::class, 'processReturn'])->name('process');
+    Route::delete('/{returnInvoice}', [ReturnInvoiceController::class, 'destroy'])->name('destroy');
 });

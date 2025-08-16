@@ -38,6 +38,12 @@ class ZatcaInvoice extends Model
         'cleared_at',
         'error_message',
         'validation_errors',
+        // Return-specific fields
+        'return_reason',
+        'original_invoice_number',
+        'original_invoice_id',
+        'return_type',
+        'return_date',
     ];
 
     protected $casts = [
@@ -112,5 +118,21 @@ class ZatcaInvoice extends Model
             'failed' => 'danger',
             default => 'secondary'
         };
+    }
+
+    public function returns()
+    {
+        return $this->hasMany(ZatcaInvoice::class, 'original_invoice_id')
+                    ->where('invoice_type', '381');
+    }
+
+    public function hasReturns(): bool
+    {
+        return $this->returns()->exists();
+    }
+
+    public function originalInvoice()
+    {
+        return $this->belongsTo(ZatcaInvoice::class, 'original_invoice_id');
     }
 }

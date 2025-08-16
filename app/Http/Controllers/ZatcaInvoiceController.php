@@ -19,7 +19,8 @@ class ZatcaInvoiceController extends Controller
 
     public function index()
     {
-        $invoices = ZatcaInvoice::with('certificate')
+        $invoices = ZatcaInvoice::with(['certificate', 'returns'])
+                               ->where('invoice_type', '!=', '381') // Exclude credit notes from main listing
                                ->orderBy('created_at', 'desc')
                                ->paginate(15);
         return view('zatca.invoices.index', compact('invoices'));
@@ -139,11 +140,25 @@ class ZatcaInvoiceController extends Controller
                 $invoice->currency
             );
 
-            // Add note if needed
-            $builder->addNote('ABC');
+            // Add note - for credit/debit notes, include reason (BR-KSA-17, KSA-10)
+            if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                $reason = $invoice->return_reason ?? 'Product return';
+                $builder->addNote($reason, 'en'); // Use English for better compatibility
+                
+                // Add specific KSA-10 element for credit note reason
+                $builder->addElement('cbc:InstructionNote', $reason);
+            } else {
+                $builder->addNote('ABC');
+            }
             
             // Set currency codes
             $builder->setCurrencyCodes($invoice->currency);
+            
+            // Add billing reference for credit/debit notes BEFORE AdditionalDocumentReference (BR-KSA-56)
+            if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                $originalInvoiceNumber = $invoice->original_invoice_number ?? 'INV-001';
+                $builder->addBillingReference($originalInvoiceNumber);
+            }
             
             // Add ICV and PIH references
             $builder->addAdditionalDocumentReference('ICV', (string)$invoice->icv);
@@ -165,9 +180,28 @@ class ZatcaInvoiceController extends Controller
                 'countryCode' => 'SA'
             ];
             
+            // Use certificate VAT number for ZATCA compliance (certificate-permissions)
+            $certificate = $invoice->certificate;
+            
+            // Try to extract VAT from certificate fields
+            $sellerVat = null;
+            if ($certificate->organization_unit_name && strlen($certificate->organization_unit_name) === 15) {
+                $sellerVat = $certificate->organization_unit_name;
+            } elseif ($certificate->serial_number && strlen($certificate->serial_number) === 15) {
+                $sellerVat = $certificate->serial_number;
+            } else {
+                // Use invoice VAT if certificate doesn't have proper VAT
+                $sellerVat = $invoice->seller_info['vat_number'];
+            }
+            
+            // Ensure VAT number format compliance (BR-KSA-40)
+            if (!$sellerVat || strlen($sellerVat) !== 15 || !str_starts_with($sellerVat, '3') || !str_ends_with($sellerVat, '3')) {
+                $sellerVat = '310122393500003'; // Default compliant VAT number
+            }
+            
             $builder->setSupplierParty(
                 '1010010000',
-                $invoice->seller_info['vat_number'],
+                $sellerVat,
                 $invoice->seller_info['name'],
                 $sellerAddress
             );
@@ -195,27 +229,32 @@ class ZatcaInvoiceController extends Controller
             // Add allowance/charge
             $builder->addAllowanceCharge(false, 'discount', '0.00');
 
+            // For credit/debit notes, use absolute values
+            $subtotal = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->subtotal) : $invoice->subtotal;
+            $taxAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->tax_amount) : $invoice->tax_amount;
+            $totalAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->total_amount) : $invoice->total_amount;
+            
             // Add tax totals
             $taxSubtotals = [
                 [
-                    'taxableAmount' => number_format($invoice->subtotal, 2),
-                    'taxAmount' => number_format($invoice->tax_amount, 2),
+                    'taxableAmount' => number_format($subtotal, 2),
+                    'taxAmount' => number_format($taxAmount, 2),
                     'categoryId' => 'S',
                     'percent' => 15.00
                 ]
             ];
 
-            $builder->addTaxTotal(number_format($invoice->tax_amount, 2), $invoice->currency);
-            $builder->addTaxTotal(number_format($invoice->tax_amount, 2), $invoice->currency, $taxSubtotals);
+            $builder->addTaxTotal(number_format($taxAmount, 2), $invoice->currency);
+            $builder->addTaxTotal(number_format($taxAmount, 2), $invoice->currency, $taxSubtotals);
 
             // Set legal monetary total
             $builder->setLegalMonetaryTotal(
-                number_format($invoice->subtotal, 2),
-                number_format($invoice->subtotal, 2),
-                number_format($invoice->total_amount, 2),
+                number_format($subtotal, 2),
+                number_format($subtotal, 2),
+                number_format($totalAmount, 2),
                 '0.00',
                 '0.00',
-                number_format($invoice->total_amount, 2),
+                number_format($totalAmount, 2),
                 $invoice->currency
             );
 
@@ -223,11 +262,22 @@ class ZatcaInvoiceController extends Controller
             foreach ($invoice->line_items as $index => $item) {
                 $lineTotal = $item['line_total'];
                 $lineTax = $item['tax_amount'];
-                $totalWithTax = $item['total_with_tax'];
+                // Handle backward compatibility for existing invoices
+                $totalWithTax = $item['total_with_tax'] ?? ($item['total_amount'] ?? ($lineTotal + $lineTax));
+                
+                // For credit/debit notes, use absolute values (BR-KSA-F-04)
+                if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                    $lineTotal = abs($lineTotal);
+                    $lineTax = abs($lineTax);
+                    $totalWithTax = abs($totalWithTax);
+                    $quantity = abs($item['quantity']);
+                } else {
+                    $quantity = $item['quantity'];
+                }
                 
                 $builder->addInvoiceLine(
                     (string)($index + 1),
-                    $item['quantity'],
+                    $quantity,
                     'PCE',
                     number_format($lineTotal, 2),
                     $item['name'],

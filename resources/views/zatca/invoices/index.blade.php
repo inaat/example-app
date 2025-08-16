@@ -4,9 +4,14 @@
 @section('page-title', 'ZATCA Invoices')
 
 @section('page-actions')
-    <a href="{{ route('zatca.invoices.create') }}" class="btn btn-primary">
-        <i class="fas fa-plus me-2"></i>Create Invoice
-    </a>
+    <div class="btn-group" role="group">
+        <a href="{{ route('zatca.invoices.create') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Create Invoice
+        </a>
+        <a href="{{ route('zatca.returns.create') }}" class="btn btn-outline-warning">
+            <i class="fas fa-undo me-2"></i>Create Return
+        </a>
+    </div>
 @endsection
 
 @section('content')
@@ -29,8 +34,14 @@
                     @forelse($invoices as $invoice)
                         <tr>
                             <td>
-                                <strong>{{ $invoice->invoice_number }}</strong><br>
-                                <small class="text-muted">{{ $invoice->uuid }}</small>
+                                <strong>{{ $invoice->invoice_number }}</strong>
+                                @if($invoice->hasReturns())
+                                    <span class="badge bg-warning ms-1" title="Has returns">
+                                        <i class="fas fa-undo"></i> {{ $invoice->returns->count() }}
+                                    </span>
+                                @endif
+                                <br>
+                                <small class="text-muted">{{ Str::limit($invoice->uuid, 20) }}</small>
                             </td>
                             <td>
                                 <span class="badge bg-info">
@@ -70,6 +81,14 @@
                                        class="btn btn-sm btn-outline-primary" title="View">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                    
+                                    @if($invoice->zatca_status === 'reported' || $invoice->zatca_status === 'cleared')
+                                        <a href="{{ route('zatca.returns.create-from', $invoice) }}" 
+                                           class="btn btn-sm btn-outline-warning" title="Create Return">
+                                            <i class="fas fa-undo"></i>
+                                        </a>
+                                    @endif
+                                    
                                     @if($invoice->isPending())
                                         <form action="{{ route('zatca.invoices.destroy', $invoice) }}" 
                                               method="POST" class="d-inline"

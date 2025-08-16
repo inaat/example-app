@@ -14,6 +14,47 @@
                 <form action="{{ route('zatca.invoices.store') }}" method="POST" id="invoiceForm">
                     @csrf
                     
+                    <!-- Invoice Type Information Panel -->
+                    <div class="alert alert-info mb-4" role="alert">
+                        <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>ZATCA Invoice Types & Subtypes Guide</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Invoice Types:</h6>
+                                <ul class="mb-2">
+                                    <li><strong>Standard Invoice (388):</strong> Regular B2B invoices with full buyer details</li>
+                                    <li><strong>Credit Note (381):</strong> Refunds, returns, or invoice reductions</li>
+                                    <li><strong>Debit Note (383):</strong> Additional charges or invoice increases</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold">Invoice Subtypes:</h6>
+                                <ul class="mb-2">
+                                    <li><strong>Standard (01):</strong> Requires ZATCA clearance before issuing to customer</li>
+                                    <li><strong>Simplified (02):</strong> Issue to customer first, then report to ZATCA within 24 hours</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <h6 class="fw-bold">Common Combinations:</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small>
+                                            <span class="badge bg-primary me-1">388 + 01</span> B2B invoices (requires clearance)<br>
+                                            <span class="badge bg-success me-1">388 + 02</span> B2C invoices (reporting only)
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small>
+                                            <span class="badge bg-warning me-1">381 + 01</span> B2B credit notes (requires clearance)<br>
+                                            <span class="badge bg-info me-1">381 + 02</span> B2C credit notes (reporting only)
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="certificate_info_id" class="form-label">ZATCA Certificate *</label>
@@ -54,6 +95,13 @@
                             @error('invoice_type')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                            <div class="form-text">
+                                <small>
+                                    <strong>388:</strong> Regular B2B invoices | 
+                                    <strong>381:</strong> Credit notes (refunds/returns) | 
+                                    <strong>383:</strong> Debit notes (additional charges)
+                                </small>
+                            </div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -66,6 +114,12 @@
                             @error('invoice_subtype')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                            <div class="form-text">
+                                <small>
+                                    <strong>01 (Standard):</strong> Requires ZATCA clearance before issuing | 
+                                    <strong>02 (Simplified):</strong> Issue first, report within 24hrs
+                                </small>
+                            </div>
                         </div>
                     </div>
 

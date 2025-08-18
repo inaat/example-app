@@ -12,9 +12,14 @@ use App\Models\CertificateInfo; // Eloquent model replacing DbHelper
 use DOMDocument;
 class TestController extends Controller
 {
+    public  function test(){
+                return view('zatca.onboarding.newcreate');
+
+    }
     // Simple test method
     public function index()
     {
+         
           $certInfo = CertificateInfo::first();
 
         if (!$certInfo) {

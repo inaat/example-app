@@ -129,7 +129,7 @@ class ZatcaOnboardingController extends Controller
 
             // Update API URLs for new environment
             $apipath = match($request->environment_type) {
-                'NonProduction' => 'developer-portal',
+                'NonProduction' => 'complianceCsidUrl',
                 'Simulation' => 'simulation', 
                 'Production' => 'production',
                 default => 'developer-portal'

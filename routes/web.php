@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TestZatcaOnboardingController;
 
 
-// Route::get('/', [App\Http\Controllers\TestController::class, 'index']);
+Route::get('/new', [App\Http\Controllers\TestController::class, 'test']);
 
 // Route::get('/zatca/onboard', [TestZatcaOnboardingController::class, 'onboard']);
 
@@ -12,6 +12,7 @@ use App\Http\Controllers\TestZatcaOnboardingController;
 use App\Http\Controllers\ZatcaOnboardingController;
 use App\Http\Controllers\ZatcaInvoiceController;
 use App\Http\Controllers\ReturnInvoiceController;
+use App\Http\Controllers\CompanyOnboardingController;
 
 Route::get('/', function () {
     return redirect()->route('zatca.onboarding.index');
@@ -55,6 +56,12 @@ Route::prefix('zatca/returns')->name('zatca.returns.')->group(function () {
     Route::post('/{returnInvoice}/generate-xml', [ReturnInvoiceController::class, 'generateReturnXML'])->name('generate-xml');
     Route::post('/{returnInvoice}/process', [ReturnInvoiceController::class, 'processReturn'])->name('process');
     Route::delete('/{returnInvoice}', [ReturnInvoiceController::class, 'destroy'])->name('destroy');
+});
+
+// Company ZATCA Onboarding Routes
+Route::prefix('company-onboarding')->name('company-onboarding.')->group(function () {
+    Route::get('/', [CompanyOnboardingController::class, 'create'])->name('create');
+    Route::post('/', [CompanyOnboardingController::class, 'store'])->name('store');
 });
 
 // Debit Notes Routes

@@ -155,37 +155,9 @@
                     </div>
 
                     <!-- Seller Information -->
-                    <h6 class="border-bottom pb-2 mb-3">Seller Information</h6>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="seller_name" class="form-label">Seller Name *</label>
-                            <input type="text" class="form-control @error('seller_name') is-invalid @enderror" 
-                                   id="seller_name" name="seller_name" 
-                                   value="{{ old('seller_name', 'Maximum Speed Tech Supply LTD') }}" required>
-                            @error('seller_name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="seller_vat" class="form-label">Seller VAT Number *</label>
-                            <input type="text" class="form-control @error('seller_vat') is-invalid @enderror" 
-                                   id="seller_vat" name="seller_vat" 
-                                   value="{{ old('seller_vat', '399999999900003') }}" required>
-                            @error('seller_vat')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="seller_address" class="form-label">Seller Address *</label>
-                        <textarea class="form-control @error('seller_address') is-invalid @enderror" 
-                                  id="seller_address" name="seller_address" rows="2" required>{{ old('seller_address', 'Riyadh, Saudi Arabia') }}</textarea>
-                        @error('seller_address')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    <div class="alert alert-success mb-4" role="alert">
+                        <h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Seller Information</h6>
+                        <p class="mb-0">Seller information will be automatically populated from the selected ZATCA certificate.</p>
                     </div>
 
                     <!-- Buyer Information -->

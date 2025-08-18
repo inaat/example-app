@@ -83,15 +83,15 @@ class DebitNoteController extends Controller
                 }
             }
             
-            // Use the extracted VAT or fallback
+            // Use the extracted VAT or fallback to certificate data
             if (!$sellerVat) {
-                $sellerVat = '399999999900003'; // Use the VAT from certificate
+                $sellerVat = $certificate->vat_number ?? '312844309300003'; // Use certificate VAT or real production VAT
             }
             
             $sellerInfo = [
-                'name' => $certificate->organization_name,
+                'name' => $certificate->organization_name ?? 'شركة ازدهار الصحراء للتعمير',
                 'vat_number' => $sellerVat,
-                'address' => 'Riyadh, Saudi Arabia'
+                'address' => $certificate->address ?? 'الرياض، العليا، المملكة العربية السعودية'
             ];
 
             // Create debit note

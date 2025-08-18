@@ -39,7 +39,15 @@ class ZatcaOnboardingController extends Controller
             'otp_used' => 'nullable|string|max:20',
         ]);
 
-        $serialNumber = "1-TST|2-" . $request->organization_identifier . "|3-" . time();
+        // Generate serial number based on environment
+        $prefix = match($request->environment_type) {
+            'Production' => 'PRD',
+            'Simulation' => 'SIM', 
+            'NonProduction' => 'TST',
+            default => 'TST'
+        };
+        
+        $serialNumber = "1-{$prefix}|2-" . $request->organization_identifier . "|3-" . time();
 
         $certificate = CertificateInfo::create([
             'organization_identifier' => $request->organization_identifier,
@@ -53,6 +61,9 @@ class ZatcaOnboardingController extends Controller
             'environment_type' => $request->environment_type,
             'otp_used' => $request->otp_used,
             'status' => 'pending',
+            // Store additional fields for invoice controllers
+            'vat_number' => $request->organization_identifier, // VAT is same as organization_identifier
+            'address' => $request->location_address, // Address for invoice generation
         ]);
 
         return redirect()->route('zatca.onboarding.show', $certificate)
@@ -95,6 +106,10 @@ class ZatcaOnboardingController extends Controller
             'environment_type',
             'otp_used'
         ]);
+        
+        // Add additional fields for invoice controllers
+        $updateData['vat_number'] = $request->organization_identifier;
+        $updateData['address'] = $request->location_address;
 
         // If environment changed, reset all ZATCA-related fields
         if ($certificate->environment_type !== $request->environment_type) {

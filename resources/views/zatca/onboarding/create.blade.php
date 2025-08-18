@@ -14,120 +14,91 @@
                 <form action="{{ route('zatca.onboarding.store') }}" method="POST">
                     @csrf
                     
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="organization_identifier" class="form-label">Organization Identifier *</label>
-                            <input type="text" class="form-control @error('organization_identifier') is-invalid @enderror" 
-                                   id="organization_identifier" name="organization_identifier" 
-                                   value="{{ old('organization_identifier', '399999999900003') }}" required>
-                            <div class="form-text">
-                                <strong>Test VAT Numbers:</strong><br>
-                                NonProduction/Simulation: 399999999900003<br>
-                                Production: Use your actual VAT number
-                            </div>
-                            @error('organization_identifier')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="organization_name" class="form-label">Organization Name *</label>
-                            <input type="text" class="form-control @error('organization_name') is-invalid @enderror" 
-                                   id="organization_name" name="organization_name" 
-                                   value="{{ old('organization_name', 'Maximum Speed Tech Supply LTD') }}" required>
-                            @error('organization_name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                    <div class="mb-3">
+                        <label for="organization_identifier" class="form-label">VAT Number *</label>
+                        <input type="text" class="form-control @error('organization_identifier') is-invalid @enderror" 
+                               id="organization_identifier" name="organization_identifier" 
+                               value="{{ old('organization_identifier', '399999999900003') }}" required>
+                        @error('organization_identifier')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="organization_name" class="form-label">Company Name *</label>
+                        <input type="text" class="form-control @error('organization_name') is-invalid @enderror" 
+                               id="organization_name" name="organization_name" 
+                               value="{{ old('organization_name', 'Maximum Speed Tech Supply LTD') }}" required>
+                        @error('organization_name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="organization_unit_name" class="form-label">Organization Unit Name</label>
-                            <input type="text" class="form-control @error('organization_unit_name') is-invalid @enderror" 
-                                   id="organization_unit_name" name="organization_unit_name" 
-                                   value="{{ old('organization_unit_name', 'Riyadh Branch') }}">
-                            @error('organization_unit_name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="common_name" class="form-label">Common Name *</label>
-                            <input type="text" class="form-control @error('common_name') is-invalid @enderror" 
-                                   id="common_name" name="common_name" 
-                                   value="{{ old('common_name', 'TST-886431145-399999999900003') }}" required>
-                            @error('common_name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                    
+                    <div class="mb-3">
+                        <label for="organization_unit_name" class="form-label">Branch/Department</label>
+                        <input type="text" class="form-control @error('organization_unit_name') is-invalid @enderror" 
+                               id="organization_unit_name" name="organization_unit_name" 
+                               value="{{ old('organization_unit_name', 'Riyadh Branch') }}">
+                        @error('organization_unit_name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="country_name" class="form-label">Country Code *</label>
-                            <select class="form-select @error('country_name') is-invalid @enderror" 
-                                    id="country_name" name="country_name" required>
-                                <option value="SA" {{ old('country_name', 'SA') == 'SA' ? 'selected' : '' }}>SA - Saudi Arabia</option>
-                            </select>
-                            @error('country_name')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="environment_type" class="form-label">Environment Type *</label>
-                            <select class="form-select @error('environment_type') is-invalid @enderror" 
-                                    id="environment_type" name="environment_type" required>
-                                <option value="NonProduction" {{ old('environment_type', 'NonProduction') == 'NonProduction' ? 'selected' : '' }}>
-                                    Non Production
-                                </option>
-                                <option value="Simulation" {{ old('environment_type') == 'Simulation' ? 'selected' : '' }}>
-                                    Simulation
-                                </option>
-                                <option value="Production" {{ old('environment_type') == 'Production' ? 'selected' : '' }}>
-                                    Production
-                                </option>
-                            </select>
-                            @error('environment_type')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="location_address" class="form-label">Location Address</label>
-                            <input type="text" class="form-control @error('location_address') is-invalid @enderror" 
-                                   id="location_address" name="location_address" 
-                                   value="{{ old('location_address', 'RMRE1234') }}">
-                            @error('location_address')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="business_category" class="form-label">Business Category</label>
-                            <input type="text" class="form-control @error('business_category') is-invalid @enderror" 
-                                   id="business_category" name="business_category" 
-                                   value="{{ old('business_category', 'Supply activities') }}">
-                            @error('business_category')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                    
+                    <div class="mb-3">
+                        <label for="location_address" class="form-label">Location Address</label>
+                        <input type="text" class="form-control @error('location_address') is-invalid @enderror" 
+                               id="location_address" name="location_address" 
+                               value="{{ old('location_address', 'Riyadh, Saudi Arabia') }}">
+                        @error('location_address')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
                     </div>
 
                     <div class="mb-3">
-                        <label for="otp_used" class="form-label">OTP (One Time Password)</label>
+                        <label for="environment_type" class="form-label">Environment Type *</label>
+                        <select class="form-select @error('environment_type') is-invalid @enderror" 
+                                id="environment_type" name="environment_type" required>
+                            <option value="NonProduction" {{ old('environment_type', 'NonProduction') == 'NonProduction' ? 'selected' : '' }}>
+                                Non Production
+                            </option>
+                            <option value="Simulation" {{ old('environment_type') == 'Simulation' ? 'selected' : '' }}>
+                                Simulation
+                            </option>
+                            <option value="Production" {{ old('environment_type') == 'Production' ? 'selected' : '' }}>
+                                Production
+                            </option>
+                        </select>
+                        @error('environment_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="business_category" class="form-label">Business Category</label>
+                        <input type="text" class="form-control @error('business_category') is-invalid @enderror" 
+                               id="business_category" name="business_category" 
+                               value="{{ old('business_category', 'Supply activities') }}">
+                        @error('business_category')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="otp_used" class="form-label">ZATCA OTP</label>
                         <input type="text" class="form-control @error('otp_used') is-invalid @enderror" 
                                id="otp_used" name="otp_used" 
-                               value="{{ old('otp_used', '111222') }}"
-                               placeholder="Enter OTP provided by ZATCA">
+                               value="{{ old('otp_used') }}"
+                               placeholder="Enter OTP from ZATCA portal">
                         @error('otp_used')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
-                        <div class="form-text">This OTP will be used for compliance and production CSID requests.</div>
+                        <div class="form-text">Required for production CSID generation</div>
                     </div>
+
+                    <!-- Hidden fields for auto-generated values -->
+                    <input type="hidden" name="common_name" id="common_name_hidden" value="">
+                    <input type="hidden" name="country_name" value="SA">
 
                     <div class="d-flex justify-content-end">
                         <a href="{{ route('zatca.onboarding.index') }}" class="btn btn-secondary me-2">Cancel</a>
@@ -173,4 +144,42 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+function updateAutoGeneratedFields() {
+    const environment = document.getElementById('environment_type').value;
+    const vatNumber = document.getElementById('organization_identifier').value;
+    
+    // Generate common name based on environment and VAT number
+    let prefix = 'TST'; // Default
+    if (environment === 'Production') {
+        prefix = 'PRD';
+    } else if (environment === 'Simulation') {
+        prefix = 'SIM';
+    }
+    
+    // For production, use commercial registration from real data
+    const commercialReg = environment === 'Production' ? '1009191090' : '886431145';
+    const commonName = `${prefix}-${commercialReg}-${vatNumber}`;
+    document.getElementById('common_name_hidden').value = commonName;
+}
+
+// Update fields when relevant inputs change
+document.addEventListener('DOMContentLoaded', function() {
+    const fieldsToWatch = ['environment_type', 'organization_identifier'];
+    
+    fieldsToWatch.forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+            element.addEventListener('input', updateAutoGeneratedFields);
+            element.addEventListener('change', updateAutoGeneratedFields);
+        }
+    });
+    
+    // Initial generation
+    updateAutoGeneratedFields();
+});
+</script>
 @endsection

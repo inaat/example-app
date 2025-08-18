@@ -36,6 +36,9 @@ class CertificateInfo extends Model
         'location_address',
         'business_category',
         'status',
+        'otp_used',
+        'vat_number',
+        'address',
     ];
 
     /**

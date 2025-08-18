@@ -43,9 +43,6 @@ class ZatcaInvoiceController extends Controller
             'issue_date' => 'required|date',
             'issue_time' => 'required',
             'due_date' => 'nullable|date|after_or_equal:issue_date',
-            'seller_name' => 'required|string|max:255',
-            'seller_vat' => 'required|string|max:20',
-            'seller_address' => 'required|string',
             'buyer_name' => 'nullable|string|max:255',
             'buyer_vat' => 'nullable|string|max:20',
             'buyer_address' => 'nullable|string',
@@ -58,6 +55,25 @@ class ZatcaInvoiceController extends Controller
         ]);
 
         $certificate = CertificateInfo::findOrFail($request->certificate_info_id);
+        
+        // CRITICAL: Use the exact VAT number from certificate serial number for ZATCA compliance
+        $sellerVat = null;
+        
+        // Extract VAT from certificate serial number (format: 1-TST|2-VAT|3-NUM)
+        if ($certificate->serial_number && strpos($certificate->serial_number, '|2-') !== false) {
+            $parts = explode('|', $certificate->serial_number);
+            foreach ($parts as $part) {
+                if (str_starts_with($part, '2-')) {
+                    $sellerVat = substr($part, 2); // Extract VAT from serial number
+                    break;
+                }
+            }
+        }
+        
+        // Fallback only if no VAT found in serial number
+        if (!$sellerVat) {
+            $sellerVat = $certificate->vat_number ?? $certificate->organization_identifier ?? '312844309300003';
+        }
         
         // Calculate totals
         $subtotal = 0;
@@ -94,9 +110,9 @@ class ZatcaInvoiceController extends Controller
             'icv' => $certificate->getNextICV(),
             'previous_invoice_hash' => $certificate->lastInvoiceHash ?: 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==',
             'seller_info' => [
-                'name' => $request->seller_name,
-                'vat_number' => $request->seller_vat,
-                'address' => $request->seller_address,
+                'name' => $certificate->organization_name ?? 'شركة ازدهار الصحراء للتعمير',
+                'vat_number' => $sellerVat,
+                'address' => $certificate->address ?? 'الرياض، العليا، المملكة العربية السعودية',
             ],
             'buyer_info' => $request->buyer_name ? [
                 'name' => $request->buyer_name,
@@ -181,34 +197,38 @@ class ZatcaInvoiceController extends Controller
             // Use certificate VAT number for ZATCA compliance (certificate-permissions)
             $certificate = $invoice->certificate;
             
-            // Extract VAT from certificate serial number (format: 1-TST|2-VAT|3-NUM)
+            // CRITICAL: Use the exact VAT number from certificate serial number for ZATCA compliance
             $sellerVat = null;
+            
+            // Extract VAT from certificate serial number (format: 1-TST|2-VAT|3-NUM)
             if ($certificate->serial_number && strpos($certificate->serial_number, '|2-') !== false) {
                 $parts = explode('|', $certificate->serial_number);
                 foreach ($parts as $part) {
                     if (str_starts_with($part, '2-')) {
-                        $vatCandidate = substr($part, 2);
-                        if (strlen($vatCandidate) === 15 && str_starts_with($vatCandidate, '3') && str_ends_with($vatCandidate, '3')) {
-                            $sellerVat = $vatCandidate;
-                            break;
-                        }
+                        $sellerVat = substr($part, 2); // Extract VAT from serial number
+                        break;
                     }
                 }
             }
             
-            // Fallback to invoice VAT if extraction failed
+            // Fallback only if no VAT found in serial number
             if (!$sellerVat) {
-                $sellerVat = $invoice->seller_info['vat_number'];
-                // Ensure VAT number format compliance (BR-KSA-40)
-                if (!$sellerVat || strlen($sellerVat) !== 15 || !str_starts_with($sellerVat, '3') || !str_ends_with($sellerVat, '3')) {
-                    $sellerVat = '399999999900003'; // Use the VAT from certificate
-                }
+                $sellerVat = $certificate->vat_number ?? $certificate->organization_identifier ?? '312844309300003';
             }
+            
+            // Debug: Log the VAT numbers being used
+            \Log::info('ZATCA VAT Debug', [
+                'certificate_serial' => $certificate->serial_number,
+                'extracted_vat' => $sellerVat,
+                'certificate_vat' => $certificate->vat_number,
+                'certificate_org_id' => $certificate->organization_identifier,
+                'invoice_id' => $invoice->id
+            ]);
             
             $builder->setSupplierParty(
                 '1010010000',
                 $sellerVat,
-                $invoice->seller_info['name'],
+                $invoice->seller_info['name'] ?? $certificate->organization_name ?? 'شركة ازدهار الصحراء للتعمير',
                 $sellerAddress
             );
 

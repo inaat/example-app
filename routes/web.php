@@ -13,6 +13,7 @@ use App\Http\Controllers\ZatcaOnboardingController;
 use App\Http\Controllers\ZatcaInvoiceController;
 use App\Http\Controllers\ReturnInvoiceController;
 use App\Http\Controllers\CompanyOnboardingController;
+use App\Http\Controllers\CompanyInvoiceController;
 
 Route::get('/', function () {
     return redirect()->route('zatca.onboarding.index');
@@ -62,6 +63,46 @@ Route::prefix('zatca/returns')->name('zatca.returns.')->group(function () {
 Route::prefix('company-onboarding')->name('company-onboarding.')->group(function () {
     Route::get('/', [CompanyOnboardingController::class, 'create'])->name('create');
     Route::post('/', [CompanyOnboardingController::class, 'store'])->name('store');
+});
+
+// Company Invoice Routes
+Route::prefix('zatca/company/invoices')->name('zatca.company.invoices.')->group(function () {
+    Route::get('/', [CompanyInvoiceController::class, 'index'])->name('index');
+    Route::get('/create', [CompanyInvoiceController::class, 'create'])->name('create');
+    Route::post('/', [CompanyInvoiceController::class, 'store'])->name('store');
+    Route::get('/{invoice}', [CompanyInvoiceController::class, 'show'])->name('show');
+    Route::get('/{invoice}/print', [CompanyInvoiceController::class, 'print'])->name('print');
+    Route::post('/{invoice}/generate-xml', [CompanyInvoiceController::class, 'generateXML'])->name('generate-xml');
+    Route::post('/{invoice}/sign', [CompanyInvoiceController::class, 'signInvoice'])->name('sign');
+    Route::post('/{invoice}/submit', [CompanyInvoiceController::class, 'submitToZatca'])->name('submit');
+    Route::post('/{invoice}/qr-code', [CompanyInvoiceController::class, 'generateQRCode'])->name('qr-code');
+    Route::get('/{invoice}/create-return', [CompanyInvoiceController::class, 'createReturn'])->name('create-return');
+    Route::get('/{invoice}/create-debit', [CompanyInvoiceController::class, 'createDebit'])->name('create-debit');
+    Route::delete('/{invoice}', [CompanyInvoiceController::class, 'destroy'])->name('destroy');
+});
+
+// Company Returns Routes
+Route::prefix('zatca/company/returns')->name('zatca.company.returns.')->group(function () {
+    Route::get('/', [CompanyInvoiceController::class, 'returnsIndex'])->name('index');
+    Route::get('/{invoice}', [CompanyInvoiceController::class, 'show'])->name('show');
+    Route::get('/{invoice}/print', [CompanyInvoiceController::class, 'print'])->name('print');
+    Route::post('/{invoice}/generate-xml', [CompanyInvoiceController::class, 'generateXML'])->name('generate-xml');
+    Route::post('/{invoice}/sign', [CompanyInvoiceController::class, 'signInvoice'])->name('sign');
+    Route::post('/{invoice}/submit', [CompanyInvoiceController::class, 'submitToZatca'])->name('submit');
+    Route::post('/{invoice}/qr-code', [CompanyInvoiceController::class, 'generateQRCode'])->name('qr-code');
+    Route::delete('/{invoice}', [CompanyInvoiceController::class, 'destroy'])->name('destroy');
+});
+
+// Company Debits Routes
+Route::prefix('zatca/company/debits')->name('zatca.company.debits.')->group(function () {
+    Route::get('/', [CompanyInvoiceController::class, 'debitsIndex'])->name('index');
+    Route::get('/{invoice}', [CompanyInvoiceController::class, 'show'])->name('show');
+    Route::get('/{invoice}/print', [CompanyInvoiceController::class, 'print'])->name('print');
+    Route::post('/{invoice}/generate-xml', [CompanyInvoiceController::class, 'generateXML'])->name('generate-xml');
+    Route::post('/{invoice}/sign', [CompanyInvoiceController::class, 'signInvoice'])->name('sign');
+    Route::post('/{invoice}/submit', [CompanyInvoiceController::class, 'submitToZatca'])->name('submit');
+    Route::post('/{invoice}/qr-code', [CompanyInvoiceController::class, 'generateQRCode'])->name('qr-code');
+    Route::delete('/{invoice}', [CompanyInvoiceController::class, 'destroy'])->name('destroy');
 });
 
 // Debit Notes Routes

@@ -66,6 +66,39 @@
                             </a>
                         </li>
                     </ul>
+                    
+                    <hr class="text-muted">
+                    <h6 class="px-3 text-muted">COMPANY MANAGEMENT</h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('company-onboarding.*') ? 'active' : '' }}" 
+                               href="{{ route('company-onboarding.create') }}">
+                                <i class="fas fa-building me-2"></i>
+                                Company Onboarding
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('zatca.company.invoices.*') ? 'active' : '' }}" 
+                               href="{{ route('zatca.company.invoices.index') }}">
+                                <i class="fas fa-file-invoice-dollar me-2"></i>
+                                Company Invoices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('zatca.company.returns.*') ? 'active' : '' }}" 
+                               href="{{ route('zatca.company.returns.index') }}">
+                                <i class="fas fa-undo me-2"></i>
+                                Company Returns
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('zatca.company.debits.*') ? 'active' : '' }}" 
+                               href="{{ route('zatca.company.debits.index') }}">
+                                <i class="fas fa-plus-circle me-2"></i>
+                                Company Debits
+                            </a>
+                        </li>
+                    </ul>
                 </div>
             </nav>
 

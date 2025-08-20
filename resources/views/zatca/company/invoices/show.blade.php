@@ -148,7 +148,8 @@ use Illuminate\Support\Str;
                                     <thead>
                                         <tr>
                                             <th>#</th>
-                                            <th>Description</th>
+                                            <th>Product</th>
+                                            <th>SKU</th>
                                             <th>Quantity</th>
                                             <th>Unit Price</th>
                                             <th>Tax Rate</th>
@@ -158,25 +159,53 @@ use Illuminate\Support\Str;
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($invoice->line_items as $index => $item)
-                                            <tr>
-                                                <td>{{ $index + 1 }}</td>
-                                                <td>{{ $item['name'] }}</td>
-                                                <td>{{ number_format($item['quantity'], 2) }}</td>
-                                                <td>{{ number_format($item['unit_price'], 2) }}</td>
-                                                <td>{{ number_format($item['tax_rate'], 2) }}%</td>
-                                                <td>{{ number_format($item['line_total'], 2) }}</td>
-                                                <td>{{ number_format($item['tax_amount'], 2) }}</td>
-                                                <td>{{ number_format($item['total_with_tax'], 2) }}</td>
-                                            </tr>
-                                        @endforeach
+                                        @if($invoice->lineItems->count() > 0)
+                                            @foreach($invoice->lineItems as $index => $lineItem)
+                                                <tr>
+                                                    <td>{{ $index + 1 }}</td>
+                                                    <td>
+                                                        <strong>{{ $lineItem->product->name }}</strong>
+                                                        @if($lineItem->product->description)
+                                                            <br><small class="text-muted">{{ $lineItem->product->description }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($lineItem->product->sku)
+                                                            <code>{{ $lineItem->product->sku }}</code>
+                                                        @else
+                                                            <span class="text-muted">-</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>{{ number_format($lineItem->quantity, 2) }} {{ $lineItem->product->unit_of_measure }}</td>
+                                                    <td>{{ number_format($lineItem->unit_price, 2) }} SAR</td>
+                                                    <td>{{ number_format($lineItem->tax_rate, 1) }}%</td>
+                                                    <td>{{ number_format($lineItem->line_total, 2) }} SAR</td>
+                                                    <td>{{ number_format($lineItem->tax_amount, 2) }} SAR</td>
+                                                    <td><strong>{{ number_format($lineItem->total_with_tax, 2) }} SAR</strong></td>
+                                                </tr>
+                                            @endforeach
+                                        @else
+                                            {{-- Fallback to JSON line items for backward compatibility --}}
+                                            @foreach($invoice->line_items as $index => $item)
+                                                <tr>
+                                                    <td>{{ $index + 1 }}</td>
+                                                    <td colspan="2">{{ $item['name'] }}</td>
+                                                    <td>{{ number_format($item['quantity'], 2) }}</td>
+                                                    <td>{{ number_format($item['unit_price'], 2) }}</td>
+                                                    <td>{{ number_format($item['tax_rate'], 2) }}%</td>
+                                                    <td>{{ number_format($item['line_total'], 2) }}</td>
+                                                    <td>{{ number_format($item['tax_amount'], 2) }}</td>
+                                                    <td>{{ number_format($item['total_with_tax'], 2) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
                                     </tbody>
                                     <tfoot>
                                         <tr class="table-secondary">
-                                            <th colspan="5">Totals:</th>
-                                            <th>{{ number_format($invoice->subtotal, 2) }}</th>
-                                            <th>{{ number_format($invoice->tax_amount, 2) }}</th>
-                                            <th>{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</th>
+                                            <th colspan="6">Totals:</th>
+                                            <th>{{ number_format($invoice->subtotal, 2) }} {{ $invoice->currency }}</th>
+                                            <th>{{ number_format($invoice->tax_amount, 2) }} {{ $invoice->currency }}</th>
+                                            <th><strong>{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</strong></th>
                                         </tr>
                                     </tfoot>
                                 </table>

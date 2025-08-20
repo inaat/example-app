@@ -78,6 +78,14 @@ class CompanyInvoice extends Model
     }
 
     /**
+     * Get the line items for this invoice
+     */
+    public function lineItems()
+    {
+        return $this->hasMany(CompanyInvoiceLineItem::class);
+    }
+
+    /**
      * Get return invoices (credit notes) for this invoice
      */
     public function returns()

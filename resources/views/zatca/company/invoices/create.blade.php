@@ -130,9 +130,20 @@
                                     <div class="line-item border rounded p-3 mb-3">
                                         <div class="row">
                                             <div class="col-md-4 mb-2">
-                                                <label class="form-label">Item Name *</label>
-                                                <input type="text" class="form-control" name="line_items[0][name]" 
-                                                       value="{{ old('line_items.0.name', 'Sample Product') }}" required>
+                                                <label class="form-label">Select Product *</label>
+                                                <select class="form-control product-select" name="line_items[0][product_id]" required>
+                                                    <option value="">Choose Product</option>
+                                                    @foreach($products as $product)
+                                                        <option value="{{ $product->id }}" 
+                                                                data-price="{{ $product->unit_price }}"
+                                                                data-tax="{{ $product->tax_rate }}"
+                                                                data-name="{{ $product->name }}"
+                                                                data-unit="{{ $product->unit_of_measure }}"
+                                                                {{ old('line_items.0.product_id') == $product->id ? 'selected' : '' }}>
+                                                            {{ $product->name }} ({{ number_format($product->unit_price, 2) }} SAR)
+                                                        </option>
+                                                    @endforeach
+                                                </select>
                                             </div>
                                             <div class="col-md-2 mb-2">
                                                 <label class="form-label">Quantity *</label>
@@ -142,12 +153,12 @@
                                             <div class="col-md-2 mb-2">
                                                 <label class="form-label">Unit Price *</label>
                                                 <input type="number" class="form-control unit-price" name="line_items[0][unit_price]" 
-                                                       value="{{ old('line_items.0.unit_price', '100') }}" min="0" step="0.01" required>
+                                                       value="{{ old('line_items.0.unit_price', '100') }}" min="0" step="0.01" required readonly>
                                             </div>
                                             <div class="col-md-2 mb-2">
                                                 <label class="form-label">Tax Rate (%) *</label>
                                                 <input type="number" class="form-control tax-rate" name="line_items[0][tax_rate]" 
-                                                       value="{{ old('line_items.0.tax_rate', '15') }}" min="0" step="0.01" required>
+                                                       value="{{ old('line_items.0.tax_rate', '15') }}" min="0" max="100" step="0.01" required readonly>
                                             </div>
                                             <div class="col-md-2 mb-2">
                                                 <label class="form-label">Total</label>
@@ -207,8 +218,19 @@ function addLineItem() {
     newItem.innerHTML = `
         <div class="row">
             <div class="col-md-4 mb-2">
-                <label class="form-label">Item Name *</label>
-                <input type="text" class="form-control" name="line_items[${itemIndex}][name]" required>
+                <label class="form-label">Select Product *</label>
+                <select class="form-control product-select" name="line_items[${itemIndex}][product_id]" required>
+                    <option value="">Choose Product</option>
+                    @foreach($products as $product)
+                        <option value="{{ $product->id }}" 
+                                data-price="{{ $product->unit_price }}"
+                                data-tax="{{ $product->tax_rate }}"
+                                data-name="{{ $product->name }}"
+                                data-unit="{{ $product->unit_of_measure }}">
+                            {{ $product->name }} ({{ number_format($product->unit_price, 2) }} SAR)
+                        </option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-2 mb-2">
                 <label class="form-label">Quantity *</label>
@@ -218,12 +240,12 @@ function addLineItem() {
             <div class="col-md-2 mb-2">
                 <label class="form-label">Unit Price *</label>
                 <input type="number" class="form-control unit-price" name="line_items[${itemIndex}][unit_price]" 
-                       value="0" min="0" step="0.01" required>
+                       value="0" min="0" step="0.01" required readonly>
             </div>
             <div class="col-md-2 mb-2">
                 <label class="form-label">Tax Rate (%) *</label>
                 <input type="number" class="form-control tax-rate" name="line_items[${itemIndex}][tax_rate]" 
-                       value="15" min="0" step="0.01" required>
+                       value="15" min="0" max="100" step="0.01" required readonly>
             </div>
             <div class="col-md-1 mb-2">
                 <label class="form-label">Total</label>
@@ -242,6 +264,7 @@ function addLineItem() {
     
     // Attach event listeners to new inputs
     attachLineItemListeners(newItem);
+    attachProductSelectListener(newItem);
     calculateTotals();
 }
 
@@ -254,6 +277,26 @@ function attachLineItemListeners(item) {
     const inputs = item.querySelectorAll('.quantity, .unit-price, .tax-rate');
     inputs.forEach(input => {
         input.addEventListener('input', calculateTotals);
+    });
+}
+
+function attachProductSelectListener(item) {
+    const productSelect = item.querySelector('.product-select');
+    productSelect.addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        if (option.value) {
+            const unitPriceInput = item.querySelector('.unit-price');
+            const taxRateInput = item.querySelector('.tax-rate');
+            
+            unitPriceInput.value = option.getAttribute('data-price');
+            taxRateInput.value = option.getAttribute('data-tax');
+            
+            calculateTotals();
+        } else {
+            item.querySelector('.unit-price').value = '0';
+            item.querySelector('.tax-rate').value = '15';
+            calculateTotals();
+        }
     });
 }
 
@@ -283,7 +326,10 @@ function calculateTotals() {
 
 // Initialize event listeners on page load
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.line-item').forEach(attachLineItemListeners);
+    document.querySelectorAll('.line-item').forEach(function(item) {
+        attachLineItemListeners(item);
+        attachProductSelectListener(item);
+    });
     calculateTotals();
 });
 </script>

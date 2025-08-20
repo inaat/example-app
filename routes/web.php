@@ -14,6 +14,7 @@ use App\Http\Controllers\ZatcaInvoiceController;
 use App\Http\Controllers\ReturnInvoiceController;
 use App\Http\Controllers\CompanyOnboardingController;
 use App\Http\Controllers\CompanyInvoiceController;
+use App\Http\Controllers\ProductController;
 
 Route::get('/', function () {
     return redirect()->route('zatca.onboarding.index');
@@ -64,6 +65,9 @@ Route::prefix('company-onboarding')->name('company-onboarding.')->group(function
     Route::get('/', [CompanyOnboardingController::class, 'create'])->name('create');
     Route::post('/', [CompanyOnboardingController::class, 'store'])->name('store');
 });
+
+// Products Routes
+Route::resource('products', ProductController::class);
 
 // Company Invoice Routes
 Route::prefix('zatca/company/invoices')->name('zatca.company.invoices.')->group(function () {

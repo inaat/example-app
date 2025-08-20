@@ -15,9 +15,9 @@ class ApiHelper {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
             
-            // Timeout settings
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+            // Timeout settings - reduced to prevent PHP timeout
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
             
             // SSL/TLS settings for better connectivity
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CompanyZatcaOnboarding;
 use App\Models\CompanyInvoice;
+use App\Models\Product;
+use App\Models\CompanyInvoiceLineItem;
 use App\Zatca\Helpers\ApiHelper;
 use App\Zatca\Helpers\InvoiceHelper;
 use App\Zatca\Helpers\XMLInvoiceBuilder;
@@ -30,7 +32,8 @@ class CompanyInvoiceController extends Controller
     public function create()
     {
         $companies = CompanyZatcaOnboarding::where('status', 'success')->get();
-        return view('zatca.company.invoices.create', compact('companies'));
+        $products = Product::active()->orderBy('name')->get();
+        return view('zatca.company.invoices.create', compact('companies', 'products'));
     }
 
     public function store(Request $request)
@@ -48,10 +51,10 @@ class CompanyInvoiceController extends Controller
             'buyer_address' => 'nullable|string',
             'currency' => 'required|string|size:3',
             'line_items' => 'required|array|min:1',
-            'line_items.*.name' => 'required|string|max:255',
-            'line_items.*.quantity' => 'required|numeric|min:0',
+            'line_items.*.product_id' => 'required|exists:products,id',
+            'line_items.*.quantity' => 'required|numeric|min:0.01',
             'line_items.*.unit_price' => 'required|numeric|min:0',
-            'line_items.*.tax_rate' => 'required|numeric|min:0',
+            'line_items.*.tax_rate' => 'required|numeric|min:0|max:100',
         ]);
 
         $company = CompanyZatcaOnboarding::findOrFail($request->company_zatca_onboarding_id);
@@ -78,20 +81,25 @@ class CompanyInvoiceController extends Controller
         // Calculate totals
         $subtotal = 0;
         $taxAmount = 0;
-        $lineItems = [];
+        $lineItemsData = [];
 
         foreach ($request->line_items as $item) {
+            $product = Product::findOrFail($item['product_id']);
             $lineTotal = $item['quantity'] * $item['unit_price'];
             $lineTax = $lineTotal * ($item['tax_rate'] / 100);
             
-            $lineItems[] = [
-                'name' => $item['name'],
+            $lineItemsData[] = [
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'description' => $product->description,
+                'sku' => $product->sku,
                 'quantity' => $item['quantity'],
                 'unit_price' => $item['unit_price'],
                 'line_total' => $lineTotal,
                 'tax_rate' => $item['tax_rate'],
                 'tax_amount' => $lineTax,
-                'total_with_tax' => $lineTotal + $lineTax
+                'total_with_tax' => $lineTotal + $lineTax,
+                'unit_of_measure' => $product->unit_of_measure
             ];
             
             $subtotal += $lineTotal;
@@ -124,7 +132,32 @@ class CompanyInvoiceController extends Controller
             'discount_amount' => 0,
             'total_amount' => $subtotal + $taxAmount,
             'currency' => $request->currency,
-            'line_items' => $lineItems,
+            'line_items' => $lineItemsData,
+        ]);
+
+        // Save line items to separate table
+        foreach ($request->line_items as $item) {
+            CompanyInvoiceLineItem::create([
+                'company_invoice_id' => $invoice->id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'tax_rate' => $item['tax_rate']
+            ]);
+        }
+
+        // Recalculate totals from database line items to ensure accuracy
+        $invoice->refresh();
+        $dbLineItems = $invoice->lineItems;
+        $recalculatedSubtotal = $dbLineItems->sum('line_total');
+        $recalculatedTaxAmount = $dbLineItems->sum('tax_amount');
+        $recalculatedTotal = $dbLineItems->sum('total_with_tax');
+
+        // Update invoice with recalculated totals
+        $invoice->update([
+            'subtotal' => $recalculatedSubtotal,
+            'tax_amount' => $recalculatedTaxAmount,
+            'total_amount' => $recalculatedTotal
         ]);
 
         return redirect()->route('zatca.company.invoices.show', $invoice)
@@ -133,12 +166,15 @@ class CompanyInvoiceController extends Controller
 
     public function show(CompanyInvoice $invoice)
     {
-        $invoice->load('company');
+        $invoice->load(['company', 'lineItems.product']);
         return view('zatca.company.invoices.show', compact('invoice'));
     }
 
     public function generateXML(CompanyInvoice $invoice)
     {
+        // Increase execution time for XML generation which can be complex
+        set_time_limit(120); // 2 minutes
+        
         try {
             $builder = new XMLInvoiceBuilder();
             
@@ -263,10 +299,22 @@ class CompanyInvoiceController extends Controller
             // Add allowance/charge
             $builder->addAllowanceCharge(false, 'discount', '0.00');
 
+            // Use database line items totals if available, otherwise use invoice totals
+            $lineItems = $invoice->lineItems()->with('product')->get();
+            if ($lineItems->count() > 0) {
+                $dbSubtotal = $lineItems->sum('line_total');
+                $dbTaxAmount = $lineItems->sum('tax_amount');
+                $dbTotalAmount = $lineItems->sum('total_with_tax');
+            } else {
+                $dbSubtotal = $invoice->subtotal;
+                $dbTaxAmount = $invoice->tax_amount;
+                $dbTotalAmount = $invoice->total_amount;
+            }
+
             // For credit/debit notes, use absolute values
-            $subtotal = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->subtotal) : $invoice->subtotal;
-            $taxAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->tax_amount) : $invoice->tax_amount;
-            $totalAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($invoice->total_amount) : $invoice->total_amount;
+            $subtotal = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($dbSubtotal) : $dbSubtotal;
+            $taxAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($dbTaxAmount) : $dbTaxAmount;
+            $totalAmount = ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') ? abs($dbTotalAmount) : $dbTotalAmount;
             
             // Add tax totals
             $taxSubtotals = [
@@ -292,37 +340,71 @@ class CompanyInvoiceController extends Controller
                 $invoice->currency
             );
 
-            // Add invoice lines
-            foreach ($invoice->line_items as $index => $item) {
-                $lineTotal = $item['line_total'];
-                $lineTax = $item['tax_amount'];
-                // Handle backward compatibility for existing invoices
-                $totalWithTax = $item['total_with_tax'] ?? ($item['total_amount'] ?? ($lineTotal + $lineTax));
-                
-                // For credit/debit notes, use absolute values (BR-KSA-F-04)
-                if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
-                    $lineTotal = abs($lineTotal);
-                    $lineTax = abs($lineTax);
-                    $totalWithTax = abs($totalWithTax);
-                    $quantity = abs($item['quantity']);
-                } else {
-                    $quantity = $item['quantity'];
+            // Add invoice lines - use database line items if available, fallback to JSON for backward compatibility
+            $invoiceLineItems = $invoice->lineItems()->with('product')->get();
+            if ($invoiceLineItems->count() > 0) {
+                foreach ($invoiceLineItems as $index => $lineItem) {
+                    $lineTotal = $lineItem->line_total;
+                    $lineTax = $lineItem->tax_amount;
+                    $totalWithTax = $lineItem->total_with_tax;
+                    
+                    // For credit/debit notes, use absolute values (BR-KSA-F-04)
+                    if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                        $lineTotal = abs($lineTotal);
+                        $lineTax = abs($lineTax);
+                        $totalWithTax = abs($totalWithTax);
+                        $quantity = abs($lineItem->quantity);
+                    } else {
+                        $quantity = $lineItem->quantity;
+                    }
+                    
+                    $builder->addInvoiceLine(
+                        (string)($index + 1),
+                        $quantity,
+                        $lineItem->product->unit_of_measure ?? 'PCE',
+                        number_format($lineTotal, 2),
+                        $lineItem->product->name,
+                        number_format($lineItem->unit_price, 2),
+                        number_format($lineTax, 2),
+                        number_format($totalWithTax, 2),
+                        'S',
+                        $lineItem->tax_rate,
+                        [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
+                        $invoice->currency
+                    );
                 }
-                
-                $builder->addInvoiceLine(
-                    (string)($index + 1),
-                    $quantity,
-                    'PCE',
-                    number_format($lineTotal, 2),
-                    $item['name'],
-                    number_format($item['unit_price'], 2),
-                    number_format($lineTax, 2),
-                    number_format($totalWithTax, 2),
-                    'S',
-                    $item['tax_rate'],
-                    [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
-                    $invoice->currency
-                );
+            } else {
+                // Fallback to JSON line items for backward compatibility
+                foreach ($invoice->line_items as $index => $item) {
+                    $lineTotal = $item['line_total'];
+                    $lineTax = $item['tax_amount'];
+                    $totalWithTax = $item['total_with_tax'] ?? ($item['total_amount'] ?? ($lineTotal + $lineTax));
+                    
+                    // For credit/debit notes, use absolute values (BR-KSA-F-04)
+                    if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                        $lineTotal = abs($lineTotal);
+                        $lineTax = abs($lineTax);
+                        $totalWithTax = abs($totalWithTax);
+                        $quantity = abs($item['quantity']);
+                    } else {
+                        $quantity = $item['quantity'];
+                    }
+                    
+                    $builder->addInvoiceLine(
+                        (string)($index + 1),
+                        $quantity,
+                        'PCE',
+                        number_format($lineTotal, 2),
+                        $item['name'],
+                        number_format($item['unit_price'], 2),
+                        number_format($lineTax, 2),
+                        number_format($totalWithTax, 2),
+                        'S',
+                        $item['tax_rate'],
+                        [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
+                        $invoice->currency
+                    );
+                }
             }
 
             // Get the XML
@@ -346,6 +428,9 @@ class CompanyInvoiceController extends Controller
 
     public function signInvoice(CompanyInvoice $invoice)
     {
+        // Increase execution time for invoice signing which can be slow
+        set_time_limit(120); // 2 minutes
+        
         try {
             if (!$invoice->invoice_xml) {
                 return response()->json([
@@ -403,6 +488,9 @@ class CompanyInvoiceController extends Controller
 
     public function submitToZatca(CompanyInvoice $invoice)
     {
+        // Increase execution time for ZATCA API calls which can be slow
+        set_time_limit(180); // 3 minutes
+        
         try {
             if (!$invoice->signed_xml) {
                 return response()->json([

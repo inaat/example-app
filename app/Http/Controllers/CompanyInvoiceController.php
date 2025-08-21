@@ -33,28 +33,32 @@ class CompanyInvoiceController extends Controller
     {
         $companies = CompanyZatcaOnboarding::where('status', 'success')->get();
         $products = Product::active()->orderBy('name')->get();
-        return view('zatca.company.invoices.create', compact('companies', 'products'));
+        $customers = \App\Models\Customer::active()->orderBy('name')->get();
+        return view('zatca.company.invoices.create', compact('companies', 'products', 'customers'));
     }
 
     public function store(Request $request)
     {
+        // Validation - customer selection is now required
         $request->validate([
             'company_zatca_onboarding_id' => 'required|exists:company_zatca_onboarding,id',
+            'customer_id' => 'required|exists:customers,id',
             'invoice_number' => 'required|string|max:255',
             'invoice_type' => 'required|in:388,381,383',
             'invoice_subtype' => 'required|in:01,02',
             'issue_date' => 'required|date',
             'issue_time' => 'required',
             'due_date' => 'nullable|date|after_or_equal:issue_date',
-            'buyer_name' => 'nullable|string|max:255',
-            'buyer_vat' => 'nullable|string|max:20',
-            'buyer_address' => 'nullable|string',
             'currency' => 'required|string|size:3',
             'line_items' => 'required|array|min:1',
             'line_items.*.product_id' => 'required|exists:products,id',
             'line_items.*.quantity' => 'required|numeric|min:0.01',
             'line_items.*.unit_price' => 'required|numeric|min:0',
+            'line_items.*.discount_amount' => 'nullable|numeric|min:0',
+            'line_items.*.discount_percentage' => 'nullable|numeric|min:0|max:100',
             'line_items.*.tax_rate' => 'required|numeric|min:0|max:100',
+            'overall_discount_amount' => 'nullable|numeric|min:0',
+            'overall_discount_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $company = CompanyZatcaOnboarding::findOrFail($request->company_zatca_onboarding_id);
@@ -79,13 +83,27 @@ class CompanyInvoiceController extends Controller
         }
         
         // Calculate totals
-        $subtotal = 0;
-        $taxAmount = 0;
+        $subtotalAfterLineDiscounts = 0;
+        $totalTaxAmount = 0;
+        $totalLineDiscounts = 0;
         $lineItemsData = [];
 
         foreach ($request->line_items as $item) {
             $product = Product::findOrFail($item['product_id']);
-            $lineTotal = $item['quantity'] * $item['unit_price'];
+            $lineSubtotal = $item['quantity'] * $item['unit_price'];
+            
+            // Calculate line-level discount
+            $lineDiscountAmount = 0;
+            if (!empty($item['discount_amount'])) {
+                $lineDiscountAmount = (float)$item['discount_amount'];
+            } elseif (!empty($item['discount_percentage'])) {
+                $lineDiscountAmount = $lineSubtotal * ((float)$item['discount_percentage'] / 100);
+            }
+            
+            // Line total after discount (this is the taxable amount)
+            $lineTotal = $lineSubtotal - $lineDiscountAmount;
+            
+            // Tax is calculated on the discounted amount
             $lineTax = $lineTotal * ($item['tax_rate'] / 100);
             
             $lineItemsData[] = [
@@ -95,19 +113,46 @@ class CompanyInvoiceController extends Controller
                 'sku' => $product->sku,
                 'quantity' => $item['quantity'],
                 'unit_price' => $item['unit_price'],
-                'line_total' => $lineTotal,
+                'line_subtotal' => $lineSubtotal, // Before discount
+                'discount_amount' => $lineDiscountAmount,
+                'discount_percentage' => $item['discount_percentage'] ?? 0,
+                'line_total' => $lineTotal, // After discount
                 'tax_rate' => $item['tax_rate'],
                 'tax_amount' => $lineTax,
                 'total_with_tax' => $lineTotal + $lineTax,
                 'unit_of_measure' => $product->unit_of_measure
             ];
             
-            $subtotal += $lineTotal;
-            $taxAmount += $lineTax;
+            $subtotalAfterLineDiscounts += $lineTotal;
+            $totalTaxAmount += $lineTax;
+            $totalLineDiscounts += $lineDiscountAmount;
         }
+
+        // Calculate overall discount (applied to subtotal before tax)
+        $overallDiscountAmount = 0;
+        if (!empty($request->overall_discount_amount)) {
+            $overallDiscountAmount = (float)$request->overall_discount_amount;
+        } elseif (!empty($request->overall_discount_percentage)) {
+            // Overall discount should be applied to subtotal, not subtotal + tax
+            $overallDiscountAmount = $subtotalAfterLineDiscounts * ((float)$request->overall_discount_percentage / 100);
+        }
+        
+        // Apply overall discount to subtotal, then recalculate tax if needed
+        $finalSubtotalAfterAllDiscounts = $subtotalAfterLineDiscounts - $overallDiscountAmount;
+        
+        // For this implementation, we keep tax calculated on line items (before overall discount)
+        // This is the most common business practice
+        $finalTaxAmount = $totalTaxAmount;
+        
+        // Final total = subtotal after all discounts + tax
+        $finalTotal = $finalSubtotalAfterAllDiscounts + $finalTaxAmount;
+
+        // Get customer information
+        $customer = \App\Models\Customer::findOrFail($request->customer_id);
 
         $invoice = CompanyInvoice::create([
             'company_zatca_onboarding_id' => $company->id,
+            'customer_id' => $request->customer_id,
             'invoice_number' => $request->invoice_number,
             'uuid' => Str::uuid()->toString(),
             'invoice_type' => $request->invoice_type,
@@ -117,48 +162,31 @@ class CompanyInvoiceController extends Controller
             'due_date' => $request->due_date,
             'icv' => $company->getNextICV(),
             'previous_invoice_hash' => $company->lastInvoiceHash ?: 'NWZlY2ViNjZmZmM4NmYzOGQ5NTI3ODZjNmQ2OTZjNzljMmRiYzIzOWRkNGU5MWI0NjcyOWQ3M2EyN2ZiNTdlOQ==',
-            'seller_info' => [
-                'name' => $company->organization_name ?? 'Test Company LTD',
-                'vat_number' => $sellerVat,
-                'address' => $company->registered_address ?? 'الرياض، العليا، المملكة العربية السعودية',
-            ],
-            'buyer_info' => $request->buyer_name ? [
-                'name' => $request->buyer_name,
-                'vat_number' => $request->buyer_vat,
-                'address' => $request->buyer_address,
-            ] : null,
-            'subtotal' => $subtotal,
-            'tax_amount' => $taxAmount,
-            'discount_amount' => 0,
-            'total_amount' => $subtotal + $taxAmount,
+            'subtotal' => $subtotalAfterLineDiscounts, // Subtotal after line discounts but before overall discount
+            'tax_amount' => $finalTaxAmount,
+            'discount_amount' => $totalLineDiscounts, // Line-level discounts only
+            'overall_discount_amount' => $overallDiscountAmount, // Overall invoice discount only
+            'overall_discount_percentage' => $request->overall_discount_percentage ?? 0,
+            'total_amount' => $finalTotal,
             'currency' => $request->currency,
-            'line_items' => $lineItemsData,
         ]);
 
         // Save line items to separate table
-        foreach ($request->line_items as $item) {
+        foreach ($request->line_items as $index => $item) {
+            $lineItemData = $lineItemsData[$index];
+            
             CompanyInvoiceLineItem::create([
                 'company_invoice_id' => $invoice->id,
                 'product_id' => $item['product_id'],
                 'quantity' => $item['quantity'],
                 'unit_price' => $item['unit_price'],
+                'discount_amount' => $lineItemData['discount_amount'],
+                'discount_percentage' => $lineItemData['discount_percentage'],
                 'tax_rate' => $item['tax_rate']
             ]);
         }
 
-        // Recalculate totals from database line items to ensure accuracy
-        $invoice->refresh();
-        $dbLineItems = $invoice->lineItems;
-        $recalculatedSubtotal = $dbLineItems->sum('line_total');
-        $recalculatedTaxAmount = $dbLineItems->sum('tax_amount');
-        $recalculatedTotal = $dbLineItems->sum('total_with_tax');
-
-        // Update invoice with recalculated totals
-        $invoice->update([
-            'subtotal' => $recalculatedSubtotal,
-            'tax_amount' => $recalculatedTaxAmount,
-            'total_amount' => $recalculatedTotal
-        ]);
+        // Invoice totals are already correctly calculated above
 
         return redirect()->route('zatca.company.invoices.show', $invoice)
                         ->with('success', 'Invoice created successfully.');
@@ -166,7 +194,7 @@ class CompanyInvoiceController extends Controller
 
     public function show(CompanyInvoice $invoice)
     {
-        $invoice->load(['company', 'lineItems.product']);
+        $invoice->load(['company', 'customer', 'lineItems.product']);
         return view('zatca.company.invoices.show', compact('invoice'));
     }
 
@@ -340,71 +368,37 @@ class CompanyInvoiceController extends Controller
                 $invoice->currency
             );
 
-            // Add invoice lines - use database line items if available, fallback to JSON for backward compatibility
+            // Add invoice lines using database line items
             $invoiceLineItems = $invoice->lineItems()->with('product')->get();
-            if ($invoiceLineItems->count() > 0) {
-                foreach ($invoiceLineItems as $index => $lineItem) {
-                    $lineTotal = $lineItem->line_total;
-                    $lineTax = $lineItem->tax_amount;
-                    $totalWithTax = $lineItem->total_with_tax;
-                    
-                    // For credit/debit notes, use absolute values (BR-KSA-F-04)
-                    if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
-                        $lineTotal = abs($lineTotal);
-                        $lineTax = abs($lineTax);
-                        $totalWithTax = abs($totalWithTax);
-                        $quantity = abs($lineItem->quantity);
-                    } else {
-                        $quantity = $lineItem->quantity;
-                    }
-                    
-                    $builder->addInvoiceLine(
-                        (string)($index + 1),
-                        $quantity,
-                        $lineItem->product->unit_of_measure ?? 'PCE',
-                        number_format($lineTotal, 2),
-                        $lineItem->product->name,
-                        number_format($lineItem->unit_price, 2),
-                        number_format($lineTax, 2),
-                        number_format($totalWithTax, 2),
-                        'S',
-                        $lineItem->tax_rate,
-                        [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
-                        $invoice->currency
-                    );
+            foreach ($invoiceLineItems as $index => $lineItem) {
+                $lineTotal = $lineItem->line_total;
+                $lineTax = $lineItem->tax_amount;
+                $totalWithTax = $lineItem->total_with_tax;
+                
+                // For credit/debit notes, use absolute values (BR-KSA-F-04)
+                if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
+                    $lineTotal = abs($lineTotal);
+                    $lineTax = abs($lineTax);
+                    $totalWithTax = abs($totalWithTax);
+                    $quantity = abs($lineItem->quantity);
+                } else {
+                    $quantity = $lineItem->quantity;
                 }
-            } else {
-                // Fallback to JSON line items for backward compatibility
-                foreach ($invoice->line_items as $index => $item) {
-                    $lineTotal = $item['line_total'];
-                    $lineTax = $item['tax_amount'];
-                    $totalWithTax = $item['total_with_tax'] ?? ($item['total_amount'] ?? ($lineTotal + $lineTax));
-                    
-                    // For credit/debit notes, use absolute values (BR-KSA-F-04)
-                    if ($invoice->invoice_type === '381' || $invoice->invoice_type === '383') {
-                        $lineTotal = abs($lineTotal);
-                        $lineTax = abs($lineTax);
-                        $totalWithTax = abs($totalWithTax);
-                        $quantity = abs($item['quantity']);
-                    } else {
-                        $quantity = $item['quantity'];
-                    }
-                    
-                    $builder->addInvoiceLine(
-                        (string)($index + 1),
-                        $quantity,
-                        'PCE',
-                        number_format($lineTotal, 2),
-                        $item['name'],
-                        number_format($item['unit_price'], 2),
-                        number_format($lineTax, 2),
-                        number_format($totalWithTax, 2),
-                        'S',
-                        $item['tax_rate'],
-                        [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
-                        $invoice->currency
-                    );
-                }
+                
+                $builder->addInvoiceLine(
+                    (string)($index + 1),
+                    $quantity,
+                    $lineItem->product->unit_of_measure ?? 'PCE',
+                    number_format($lineTotal, 2),
+                    $lineItem->product->name,
+                    number_format($lineItem->unit_price, 2),
+                    number_format($lineTax, 2),
+                    number_format($totalWithTax, 2),
+                    'S',
+                    $lineItem->tax_rate,
+                    [['isCharge' => false, 'reason' => 'discount', 'amount' => '0.00']],
+                    $invoice->currency
+                );
             }
 
             // Get the XML
@@ -642,48 +636,8 @@ class CompanyInvoiceController extends Controller
 
     public function print(CompanyInvoice $invoice)
     {
+        $invoice->load(['company', 'customer', 'lineItems.product']);
         return view('zatca.company.invoices.print', compact('invoice'));
     }
 
-    public function createReturn(CompanyInvoice $invoice)
-    {
-        // Only allow returns for submitted invoices
-        if (!$invoice->isSubmitted()) {
-            return redirect()->back()->with('error', 'Can only create returns for submitted invoices.');
-        }
-
-        $companies = CompanyZatcaOnboarding::where('status', 'success')->get();
-        
-        return view('zatca.company.invoices.create-return', compact('invoice', 'companies'));
-    }
-
-    public function createDebit(CompanyInvoice $invoice)
-    {
-        // Only allow debit notes for submitted invoices
-        if (!$invoice->isSubmitted()) {
-            return redirect()->back()->with('error', 'Can only create debit notes for submitted invoices.');
-        }
-
-        $companies = CompanyZatcaOnboarding::where('status', 'success')->get();
-        
-        return view('zatca.company.invoices.create-debit', compact('invoice', 'companies'));
-    }
-
-    public function returnsIndex()
-    {
-        $invoices = CompanyInvoice::with(['company'])
-                               ->where('invoice_type', '383') // Credit notes only
-                               ->orderBy('created_at', 'desc')
-                               ->paginate(15);
-        return view('zatca.company.returns.index', compact('invoices'));
-    }
-
-    public function debitsIndex()
-    {
-        $invoices = CompanyInvoice::with(['company'])
-                               ->where('invoice_type', '381') // Debit notes only
-                               ->orderBy('created_at', 'desc')
-                               ->paginate(15);
-        return view('zatca.company.debits.index', compact('invoices'));
-    }
 }

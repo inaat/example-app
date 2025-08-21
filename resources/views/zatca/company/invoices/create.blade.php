@@ -81,30 +81,58 @@
                             </div>
                         </div>
 
-                        {{-- Buyer Information --}}
+                        {{-- Customer Information --}}
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h6 class="mb-0">Buyer Information (Optional for Simplified Invoices)</h6>
+                                <h6 class="mb-0">Customer Information *</h6>
+                                <small class="text-muted">Required - Please select a customer from the list</small>
                             </div>
                             <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="buyer_name" class="form-label">Buyer Name</label>
-                                        <input type="text" name="buyer_name" id="buyer_name" class="form-control" 
-                                               value="{{ old('buyer_name') }}">
+                                @if($errors->has('customer_required'))
+                                    <div class="alert alert-danger">
+                                        <strong>{{ $errors->first('customer_required') }}</strong>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="buyer_vat" class="form-label">Buyer VAT Number</label>
-                                        <input type="text" name="buyer_vat" id="buyer_vat" class="form-control" 
-                                               value="{{ old('buyer_vat') }}">
+                                @endif
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label for="customer_id" class="form-label">Select Customer</label>
+                                        <select name="customer_id" id="customer_id" class="form-control">
+                                            <option value="">Select Customer *</option>
+                                            @foreach($customers as $customer)
+                                                <option value="{{ $customer->id }}" 
+                                                        data-name="{{ $customer->name }}"
+                                                        data-vat="{{ $customer->vat_number }}"
+                                                        data-email="{{ $customer->email }}"
+                                                        data-phone="{{ $customer->phone }}"
+                                                        data-address="{{ $customer->full_address }}"
+                                                        {{ old('customer_id') == $customer->id ? 'selected' : '' }}>
+                                                    {{ $customer->display_name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <div id="selectedCustomerInfo" class="mt-2" style="display: none;">
+                                            <div class="alert alert-info py-2">
+                                                <strong>Selected Customer:</strong> <span id="selectedCustomerName"></span>
+                                                <br><small id="selectedCustomerDetails"></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">&nbsp;</label>
+                                        <div>
+                                            <a href="{{ route('customers.create') }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                + New Customer
+                                            </a>
+                                            <small class="form-text text-muted">Opens in new tab</small>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <label for="buyer_address" class="form-label">Buyer Address</label>
-                                        <textarea name="buyer_address" id="buyer_address" class="form-control" rows="2">{{ old('buyer_address') }}</textarea>
-                                    </div>
-                                </div>
+                                
+                                {{-- Hidden fields to store selected customer data for form submission --}}
+                                <input type="hidden" name="buyer_name" id="buyer_name" value="{{ old('buyer_name') }}">
+                                <input type="hidden" name="buyer_vat" id="buyer_vat" value="{{ old('buyer_vat') }}">
+                                <input type="hidden" name="buyer_address" id="buyer_address" value="{{ old('buyer_address') }}">
                             </div>
                         </div>
 
@@ -129,7 +157,7 @@
                                 <div id="lineItems">
                                     <div class="line-item border rounded p-3 mb-3">
                                         <div class="row">
-                                            <div class="col-md-4 mb-2">
+                                            <div class="col-md-3 mb-2">
                                                 <label class="form-label">Select Product *</label>
                                                 <select class="form-control product-select" name="line_items[0][product_id]" required>
                                                     <option value="">Choose Product</option>
@@ -145,8 +173,8 @@
                                                     @endforeach
                                                 </select>
                                             </div>
-                                            <div class="col-md-2 mb-2">
-                                                <label class="form-label">Quantity *</label>
+                                            <div class="col-md-1 mb-2">
+                                                <label class="form-label">Qty *</label>
                                                 <input type="number" class="form-control quantity" name="line_items[0][quantity]" 
                                                        value="{{ old('line_items.0.quantity', '1') }}" min="0" step="0.01" required>
                                             </div>
@@ -156,13 +184,28 @@
                                                        value="{{ old('line_items.0.unit_price', '100') }}" min="0" step="0.01" required readonly>
                                             </div>
                                             <div class="col-md-2 mb-2">
-                                                <label class="form-label">Tax Rate (%) *</label>
+                                                <label class="form-label">Discount</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" class="form-control discount-amount" name="line_items[0][discount_amount]" 
+                                                           value="{{ old('line_items.0.discount_amount', '0') }}" min="0" step="0.01" placeholder="Amount">
+                                                    <span class="input-group-text">or</span>
+                                                    <input type="number" class="form-control discount-percentage" name="line_items[0][discount_percentage]" 
+                                                           value="{{ old('line_items.0.discount_percentage', '0') }}" min="0" max="100" step="0.01" placeholder="%">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-1 mb-2">
+                                                <label class="form-label">Tax %</label>
                                                 <input type="number" class="form-control tax-rate" name="line_items[0][tax_rate]" 
                                                        value="{{ old('line_items.0.tax_rate', '15') }}" min="0" max="100" step="0.01" required readonly>
                                             </div>
                                             <div class="col-md-2 mb-2">
                                                 <label class="form-label">Total</label>
                                                 <input type="text" class="form-control line-total" readonly>
+                                            </div>
+                                            <div class="col-md-1 mb-2 d-flex align-items-end">
+                                                <button type="button" class="btn btn-danger btn-sm w-100" onclick="removeLineItem(this)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -176,15 +219,45 @@
 
                                 <div class="mt-3">
                                     <div class="row">
-                                        <div class="col-md-6 offset-md-6">
+                                        <div class="col-md-6">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0">Overall Invoice Discount</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">Discount Amount</label>
+                                                            <input type="number" class="form-control" name="overall_discount_amount" id="overallDiscountAmount"
+                                                                   value="{{ old('overall_discount_amount', '0') }}" min="0" step="0.01" placeholder="0.00">
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label">Discount Percentage</label>
+                                                            <input type="number" class="form-control" name="overall_discount_percentage" id="overallDiscountPercentage"
+                                                                   value="{{ old('overall_discount_percentage', '0') }}" min="0" max="100" step="0.01" placeholder="0">
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Use either amount or percentage, not both. Percentage is applied to subtotal + tax.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
                                             <table class="table table-sm">
                                                 <tr>
                                                     <td><strong>Subtotal:</strong></td>
                                                     <td class="text-end" id="subtotal">0.00</td>
                                                 </tr>
                                                 <tr>
+                                                    <td><strong>Line Discounts:</strong></td>
+                                                    <td class="text-end text-success" id="lineDiscounts">0.00</td>
+                                                </tr>
+                                                <tr>
                                                     <td><strong>Tax:</strong></td>
                                                     <td class="text-end" id="taxAmount">0.00</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Overall Discount:</strong></td>
+                                                    <td class="text-end text-success" id="overallDiscount">0.00</td>
                                                 </tr>
                                                 <tr class="border-top">
                                                     <td><strong>Total:</strong></td>
@@ -217,7 +290,7 @@ function addLineItem() {
     newItem.className = 'line-item border rounded p-3 mb-3';
     newItem.innerHTML = `
         <div class="row">
-            <div class="col-md-4 mb-2">
+            <div class="col-md-3 mb-2">
                 <label class="form-label">Select Product *</label>
                 <select class="form-control product-select" name="line_items[${itemIndex}][product_id]" required>
                     <option value="">Choose Product</option>
@@ -232,8 +305,8 @@ function addLineItem() {
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2 mb-2">
-                <label class="form-label">Quantity *</label>
+            <div class="col-md-1 mb-2">
+                <label class="form-label">Qty *</label>
                 <input type="number" class="form-control quantity" name="line_items[${itemIndex}][quantity]" 
                        value="1" min="0" step="0.01" required>
             </div>
@@ -243,17 +316,26 @@ function addLineItem() {
                        value="0" min="0" step="0.01" required readonly>
             </div>
             <div class="col-md-2 mb-2">
-                <label class="form-label">Tax Rate (%) *</label>
+                <label class="form-label">Discount</label>
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control discount-amount" name="line_items[${itemIndex}][discount_amount]" 
+                           value="0" min="0" step="0.01" placeholder="Amount">
+                    <span class="input-group-text">or</span>
+                    <input type="number" class="form-control discount-percentage" name="line_items[${itemIndex}][discount_percentage]" 
+                           value="0" min="0" max="100" step="0.01" placeholder="%">
+                </div>
+            </div>
+            <div class="col-md-1 mb-2">
+                <label class="form-label">Tax %</label>
                 <input type="number" class="form-control tax-rate" name="line_items[${itemIndex}][tax_rate]" 
                        value="15" min="0" max="100" step="0.01" required readonly>
             </div>
-            <div class="col-md-1 mb-2">
+            <div class="col-md-2 mb-2">
                 <label class="form-label">Total</label>
                 <input type="text" class="form-control line-total" readonly>
             </div>
-            <div class="col-md-1 mb-2">
-                <label class="form-label">&nbsp;</label>
-                <button type="button" class="btn btn-outline-danger btn-sm d-block" onclick="removeLineItem(this)">
+            <div class="col-md-1 mb-2 d-flex align-items-end">
+                <button type="button" class="btn btn-danger btn-sm w-100" onclick="removeLineItem(this)">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -274,9 +356,27 @@ function removeLineItem(button) {
 }
 
 function attachLineItemListeners(item) {
-    const inputs = item.querySelectorAll('.quantity, .unit-price, .tax-rate');
+    const inputs = item.querySelectorAll('.quantity, .unit-price, .tax-rate, .discount-amount, .discount-percentage');
     inputs.forEach(input => {
         input.addEventListener('input', calculateTotals);
+    });
+    
+    // Handle discount field interaction (clear one when other is used)
+    const discountAmount = item.querySelector('.discount-amount');
+    const discountPercentage = item.querySelector('.discount-percentage');
+    
+    discountAmount.addEventListener('input', function() {
+        if (this.value > 0) {
+            discountPercentage.value = 0;
+        }
+        calculateTotals();
+    });
+    
+    discountPercentage.addEventListener('input', function() {
+        if (this.value > 0) {
+            discountAmount.value = 0;
+        }
+        calculateTotals();
     });
 }
 
@@ -303,13 +403,30 @@ function attachProductSelectListener(item) {
 function calculateTotals() {
     let subtotal = 0;
     let totalTax = 0;
+    let totalLineDiscounts = 0;
     
     document.querySelectorAll('.line-item').forEach(item => {
         const quantity = parseFloat(item.querySelector('.quantity').value) || 0;
         const unitPrice = parseFloat(item.querySelector('.unit-price').value) || 0;
         const taxRate = parseFloat(item.querySelector('.tax-rate').value) || 0;
+        const discountAmount = parseFloat(item.querySelector('.discount-amount').value) || 0;
+        const discountPercentage = parseFloat(item.querySelector('.discount-percentage').value) || 0;
         
-        const lineTotal = quantity * unitPrice;
+        // Calculate line subtotal before discount
+        const lineSubtotal = quantity * unitPrice;
+        
+        // Calculate line discount
+        let lineDiscount = 0;
+        if (discountAmount > 0) {
+            lineDiscount = Math.min(discountAmount, lineSubtotal); // Don't allow discount > subtotal
+        } else if (discountPercentage > 0) {
+            lineDiscount = lineSubtotal * (discountPercentage / 100);
+        }
+        
+        // Line total after discount
+        const lineTotal = lineSubtotal - lineDiscount;
+        
+        // Tax calculated on discounted amount
         const lineTax = lineTotal * (taxRate / 100);
         const totalWithTax = lineTotal + lineTax;
         
@@ -317,11 +434,28 @@ function calculateTotals() {
         
         subtotal += lineTotal;
         totalTax += lineTax;
+        totalLineDiscounts += lineDiscount;
     });
     
+    // Calculate overall discount
+    const overallDiscountAmount = parseFloat(document.getElementById('overallDiscountAmount').value) || 0;
+    const overallDiscountPercentage = parseFloat(document.getElementById('overallDiscountPercentage').value) || 0;
+    
+    let overallDiscount = 0;
+    if (overallDiscountAmount > 0) {
+        overallDiscount = overallDiscountAmount;
+    } else if (overallDiscountPercentage > 0) {
+        overallDiscount = (subtotal + totalTax) * (overallDiscountPercentage / 100);
+    }
+    
+    const finalTotal = (subtotal + totalTax) - overallDiscount;
+    
+    // Update display
     document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+    document.getElementById('lineDiscounts').textContent = totalLineDiscounts.toFixed(2);
     document.getElementById('taxAmount').textContent = totalTax.toFixed(2);
-    document.getElementById('totalAmount').textContent = (subtotal + totalTax).toFixed(2);
+    document.getElementById('overallDiscount').textContent = overallDiscount.toFixed(2);
+    document.getElementById('totalAmount').textContent = finalTotal.toFixed(2);
 }
 
 // Initialize event listeners on page load
@@ -330,7 +464,115 @@ document.addEventListener('DOMContentLoaded', function() {
         attachLineItemListeners(item);
         attachProductSelectListener(item);
     });
+    
+    // Add event listeners for overall discount fields
+    const overallDiscountAmount = document.getElementById('overallDiscountAmount');
+    const overallDiscountPercentage = document.getElementById('overallDiscountPercentage');
+    
+    overallDiscountAmount.addEventListener('input', function() {
+        if (this.value > 0) {
+            overallDiscountPercentage.value = 0;
+        }
+        calculateTotals();
+    });
+    
+    overallDiscountPercentage.addEventListener('input', function() {
+        if (this.value > 0) {
+            overallDiscountAmount.value = 0;
+        }
+        calculateTotals();
+    });
+    
     calculateTotals();
+    
+    // Add customer selection event listener
+    const customerSelect = document.getElementById('customer_id');
+    const customerInfo = document.getElementById('selectedCustomerInfo');
+    const customerName = document.getElementById('selectedCustomerName');
+    const customerDetails = document.getElementById('selectedCustomerDetails');
+    
+    if (customerSelect) {
+        customerSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            
+            if (selectedOption.value) {
+                // Customer selected - populate hidden fields
+                document.getElementById('buyer_name').value = selectedOption.dataset.name || '';
+                document.getElementById('buyer_vat').value = selectedOption.dataset.vat || '';
+                document.getElementById('buyer_address').value = selectedOption.dataset.address || '';
+                
+                // Show customer info
+                if (customerInfo && customerName && customerDetails) {
+                    customerName.textContent = selectedOption.dataset.name || '';
+                    customerDetails.textContent = `VAT: ${selectedOption.dataset.vat || 'N/A'} | ${selectedOption.dataset.address || 'No address'}`;
+                    customerInfo.style.display = 'block';
+                }
+                
+                // Clear error styling
+                customerSelect.style.borderColor = '';
+            } else {
+                // No customer selected - clear hidden fields
+                document.getElementById('buyer_name').value = '';
+                document.getElementById('buyer_vat').value = '';
+                document.getElementById('buyer_address').value = '';
+                
+                // Hide customer info
+                if (customerInfo) {
+                    customerInfo.style.display = 'none';
+                }
+                
+                // Clear error styling
+                customerSelect.style.borderColor = '';
+            }
+        });
+        
+        // Initialize state based on current selection
+        const currentSelection = customerSelect.value;
+        if (currentSelection) {
+            // Trigger the change event to show customer info if already selected
+            customerSelect.dispatchEvent(new Event('change'));
+        }
+    }
+    
+    // Add refresh button functionality for customers
+    addRefreshCustomersButton();
+    
+    // Add form validation for customer requirement
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const customerSelect = document.getElementById('customer_id');
+            
+            if (!customerSelect.value) {
+                e.preventDefault();
+                alert('Please select a customer from the dropdown.');
+                
+                // Focus on customer section
+                customerSelect.focus();
+                
+                // Add red border to indicate error
+                customerSelect.style.borderColor = '#dc3545';
+                
+                return false;
+            }
+        });
+    }
 });
+
+// Function to add refresh customers functionality
+function addRefreshCustomersButton() {
+    const customerSelect = document.getElementById('customer_id');
+    if (customerSelect && customerSelect.parentNode) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.className = 'btn btn-sm btn-outline-secondary mt-1';
+        refreshBtn.innerHTML = '↻ Refresh';
+        refreshBtn.title = 'Refresh customer list';
+        refreshBtn.onclick = function() {
+            window.location.reload();
+        };
+        customerSelect.parentNode.appendChild(refreshBtn);
+    }
+}
 </script>
 @endsection

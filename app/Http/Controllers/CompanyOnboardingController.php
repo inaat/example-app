@@ -312,9 +312,9 @@ class CompanyOnboardingController extends Controller
                 'countryCode' => 'SA'
             ];
             $xmlBuilder->setSupplierParty(
-                $certificate->crn ?: '1010010000',  // Use same CRN as TestController
-                '399999999900003',  // Use ZATCA test VAT number like TestController
-                'Test Company LTD',  // Use same name format as TestController
+                $certificate->crn , // Use same CRN as TestController
+                $certificate->vat_number,  // Use the VAT number from certificate
+                $certificate->organization_name,  // Use organization name from database
                 $supplierAddress
             );
 

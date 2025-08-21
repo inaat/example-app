@@ -11,7 +11,7 @@
                 <h5 class="card-title mb-0">Debit Note Information</h5>
             </div>
             <div class="card-body">
-                <form action="{{ route('zatca.company.invoices.store') }}" method="POST" id="debitForm">
+                <form action="{{ route('zatca.company.debits.store') }}" method="POST" id="debitForm">
                     @csrf
                     
                     <!-- Debit Information Alert -->
@@ -33,7 +33,7 @@
                                     <p><strong>Total Amount:</strong> {{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Customer:</strong> {{ $invoice->buyer_info['name'] ?? 'No customer' }}</p>
+                                    <p><strong>Customer:</strong> {{ $invoice->customer->name ?? 'No customer' }}</p>
                                     <p><strong>Company:</strong> {{ $invoice->company->organization_name }}</p>
                                     <p><strong>Type:</strong> {{ $invoice->getInvoiceTypeName() }} ({{ $invoice->invoice_subtype === '01' ? 'Standard' : 'Simplified' }})</p>
                                 </div>
@@ -94,29 +94,72 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="return_reason" class="form-label">Reason for Additional Charges *</label>
-                        <select class="form-select @error('return_reason') is-invalid @enderror" 
-                                id="return_reason" name="return_reason" required>
+                        <label for="debit_reason" class="form-label">Reason for Additional Charges *</label>
+                        <select class="form-select @error('debit_reason') is-invalid @enderror" 
+                                id="debit_reason" name="debit_reason" required>
                             <option value="">Select Reason</option>
-                            <option value="Late payment fee" {{ old('return_reason') == 'Late payment fee' ? 'selected' : '' }}>Late payment fee</option>
-                            <option value="Processing fee" {{ old('return_reason') == 'Processing fee' ? 'selected' : '' }}>Processing fee</option>
-                            <option value="Additional services" {{ old('return_reason') == 'Additional services' ? 'selected' : '' }}>Additional services</option>
-                            <option value="Shipping charges" {{ old('return_reason') == 'Shipping charges' ? 'selected' : '' }}>Shipping charges</option>
-                            <option value="Insurance fee" {{ old('return_reason') == 'Insurance fee' ? 'selected' : '' }}>Insurance fee</option>
-                            <option value="Billing correction" {{ old('return_reason') == 'Billing correction' ? 'selected' : '' }}>Billing correction</option>
-                            <option value="Other charges" {{ old('return_reason') == 'Other charges' ? 'selected' : '' }}>Other charges</option>
+                            <option value="Late payment fee" {{ old('debit_reason') == 'Late payment fee' ? 'selected' : '' }}>Late payment fee</option>
+                            <option value="Processing fee" {{ old('debit_reason') == 'Processing fee' ? 'selected' : '' }}>Processing fee</option>
+                            <option value="Additional services" {{ old('debit_reason') == 'Additional services' ? 'selected' : '' }}>Additional services</option>
+                            <option value="Shipping charges" {{ old('debit_reason') == 'Shipping charges' ? 'selected' : '' }}>Shipping charges</option>
+                            <option value="Insurance fee" {{ old('debit_reason') == 'Insurance fee' ? 'selected' : '' }}>Insurance fee</option>
+                            <option value="Billing correction" {{ old('debit_reason') == 'Billing correction' ? 'selected' : '' }}>Billing correction</option>
+                            <option value="Other charges" {{ old('debit_reason') == 'Other charges' ? 'selected' : '' }}>Other charges</option>
                         </select>
-                        @error('return_reason')
+                        @error('debit_reason')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Copy customer information from original invoice -->
-                    @if($invoice->buyer_info)
-                    <input type="hidden" name="buyer_name" value="{{ $invoice->buyer_info['name'] }}">
-                    <input type="hidden" name="buyer_vat" value="{{ $invoice->buyer_info['vat_number'] ?? '' }}">
-                    <input type="hidden" name="buyer_address" value="{{ $invoice->buyer_info['address'] ?? '' }}">
-                    @endif
+                    <!-- Customer Selection -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Customer Information / معلومات العميل</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="customer_id" class="form-label">Select Customer *</label>
+                                        <select class="form-select @error('customer_id') is-invalid @enderror" 
+                                                id="customer_id" name="customer_id" required>
+                                            <option value="">Choose a customer...</option>
+                                            @foreach($customers as $customer)
+                                                <option value="{{ $customer->id }}" 
+                                                        data-name="{{ $customer->name }}"
+                                                        data-vat="{{ $customer->vat_number }}"
+                                                        data-email="{{ $customer->email }}"
+                                                        data-phone="{{ $customer->phone }}"
+                                                        data-address="{{ $customer->full_address }}"
+                                                        {{ old('customer_id', $invoice->customer_id) == $customer->id ? 'selected' : '' }}>
+                                                    {{ $customer->name }} @if($customer->vat_number) ({{ $customer->vat_number }}) @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('customer_id')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                        <div class="form-text">Additional charges will be applied to the selected customer.</div>
+                                    </div>
+
+                                    <!-- Customer Details Display -->
+                                    <div id="customerDetails" style="display: none;">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p><strong>Customer Name:</strong> <span id="selectedCustomerName"></span></p>
+                                                <p><strong>VAT Number:</strong> <span id="selectedCustomerVat"></span></p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Email:</strong> <span id="selectedCustomerEmail"></span></p>
+                                                <p><strong>Phone:</strong> <span id="selectedCustomerPhone"></span></p>
+                                            </div>
+                                        </div>
+                                        <p><strong>Address:</strong> <span id="selectedCustomerAddress"></span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <input type="hidden" name="currency" value="{{ $invoice->currency }}">
 
@@ -130,6 +173,7 @@
                                     <label class="form-label">Description *</label>
                                     <input type="text" class="form-control" name="line_items[0][name]" 
                                            value="{{ old('line_items.0.name', 'Additional charge') }}" required>
+                                    <input type="hidden" name="line_items[0][product_id]" value="1">
                                 </div>
                                 <div class="col-md-2 mb-2">
                                     <label class="form-label">Quantity *</label>
@@ -253,6 +297,25 @@ function attachLineItemListeners(item) {
     });
 }
 
+function updateCustomerDetails() {
+    const customerSelect = document.getElementById('customer_id');
+    const customerDetails = document.getElementById('customerDetails');
+    
+    if (customerSelect.value) {
+        const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+        
+        document.getElementById('selectedCustomerName').textContent = selectedOption.dataset.name || '';
+        document.getElementById('selectedCustomerVat').textContent = selectedOption.dataset.vat || 'N/A';
+        document.getElementById('selectedCustomerEmail').textContent = selectedOption.dataset.email || 'N/A';
+        document.getElementById('selectedCustomerPhone').textContent = selectedOption.dataset.phone || 'N/A';
+        document.getElementById('selectedCustomerAddress').textContent = selectedOption.dataset.address || 'N/A';
+        
+        customerDetails.style.display = 'block';
+    } else {
+        customerDetails.style.display = 'none';
+    }
+}
+
 function calculateTotals() {
     let subtotal = 0;
     let totalTax = 0;
@@ -280,6 +343,12 @@ function calculateTotals() {
 // Initialize event listeners on page load
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.line-item').forEach(attachLineItemListeners);
+    
+    // Customer selection change handler
+    document.getElementById('customer_id').addEventListener('change', updateCustomerDetails);
+    
+    // Initialize customer details on page load
+    updateCustomerDetails();
     calculateTotals();
 });
 </script>

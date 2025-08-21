@@ -143,16 +143,22 @@
             <h3>Seller Information / معلومات البائع</h3>
             <div class="detail-row">
                 <span class="detail-label">Name:</span>
-                <span>{{ $invoice->seller_info['name'] ?? 'N/A' }}</span>
+                <span>{{ $invoice->company->organization_name ?? 'N/A' }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">VAT Number:</span>
-                <span>{{ $invoice->seller_info['vat_number'] ?? 'N/A' }}</span>
+                <span>{{ $invoice->company->vat_number ?? 'N/A' }}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Address:</span>
-                <span>{{ $invoice->seller_info['address'] ?? 'N/A' }}</span>
+                <span>{{ $invoice->company->registered_address ?? 'N/A' }}</span>
             </div>
+            @if($invoice->company->email)
+            <div class="detail-row">
+                <span class="detail-label">Email:</span>
+                <span>{{ $invoice->company->email }}</span>
+            </div>
+            @endif
         </div>
 
         <div class="detail-section">
@@ -176,20 +182,32 @@
         </div>
     </div>
 
-    @if($invoice->buyer_info)
+    @if($invoice->customer)
     <div class="detail-section" style="margin-bottom: 20px;">
-        <h3>Buyer Information / معلومات المشتري</h3>
+        <h3>Customer Information / معلومات العميل</h3>
         <div class="detail-row">
             <span class="detail-label">Name:</span>
-            <span>{{ $invoice->buyer_info['name'] ?? 'N/A' }}</span>
+            <span>{{ $invoice->customer->name }}</span>
         </div>
         <div class="detail-row">
             <span class="detail-label">VAT Number:</span>
-            <span>{{ $invoice->buyer_info['vat_number'] ?? 'N/A' }}</span>
+            <span>{{ $invoice->customer->vat_number ?? 'N/A' }}</span>
         </div>
+        @if($invoice->customer->email)
+        <div class="detail-row">
+            <span class="detail-label">Email:</span>
+            <span>{{ $invoice->customer->email }}</span>
+        </div>
+        @endif
+        @if($invoice->customer->phone)
+        <div class="detail-row">
+            <span class="detail-label">Phone:</span>
+            <span>{{ $invoice->customer->phone }}</span>
+        </div>
+        @endif
         <div class="detail-row">
             <span class="detail-label">Address:</span>
-            <span>{{ $invoice->buyer_info['address'] ?? 'N/A' }}</span>
+            <span>{{ $invoice->customer->full_address ?? 'N/A' }}</span>
         </div>
     </div>
     @endif
@@ -221,25 +239,55 @@
                     <th>Quantity / الكمية</th>
                 @endif
                 <th>Unit Price / سعر الوحدة</th>
+                @if($invoice->invoice_type === '388')
+                    <th>Subtotal / المجموع الفرعي</th>
+                    <th>Discount / الخصم</th>
+                    <th>After Discount / بعد الخصم</th>
+                @endif
                 <th>Tax Rate / معدل الضريبة</th>
+                @if($invoice->invoice_type === '388')
+                    <th>Tax Amount / مبلغ الضريبة</th>
+                @endif
                 <th>Total / المجموع</th>
             </tr>
         </thead>
         <tbody>
-            @if($invoice->line_items && is_array($invoice->line_items))
-                @foreach($invoice->line_items as $index => $item)
+            @if($invoice->lineItems && $invoice->lineItems->count() > 0)
+                @foreach($invoice->lineItems as $index => $lineItem)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td>{{ $item['name'] ?? 'N/A' }}</td>
-                    <td class="number">{{ number_format($item['quantity'] ?? 0, 2) }}</td>
-                    <td class="number">{{ number_format($item['unit_price'] ?? 0, 2) }} {{ $invoice->currency }}</td>
-                    <td class="number">{{ number_format($item['tax_rate'] ?? 0, 1) }}%</td>
-                    <td class="number">{{ number_format($item['total_with_tax'] ?? 0, 2) }} {{ $invoice->currency }}</td>
+                    <td>{{ $lineItem->product->name ?? 'N/A' }}</td>
+                    <td class="number">{{ number_format($lineItem->quantity, 2) }}</td>
+                    <td class="number">{{ number_format($lineItem->unit_price, 2) }} {{ $invoice->currency }}</td>
+                    @if($invoice->invoice_type === '388')
+                        @php
+                            $lineSubtotal = $lineItem->quantity * $lineItem->unit_price;
+                            $discountAmount = $lineItem->discount_amount ?? 0;
+                            $afterDiscount = $lineSubtotal - $discountAmount;
+                            $taxAmount = $afterDiscount * ($lineItem->tax_rate / 100);
+                        @endphp
+                        <td class="number">{{ number_format($lineSubtotal, 2) }} {{ $invoice->currency }}</td>
+                        <td class="number">
+                            @if($lineItem->discount_amount > 0)
+                                {{ number_format($lineItem->discount_amount, 2) }} {{ $invoice->currency }}
+                            @elseif($lineItem->discount_percentage > 0)
+                                {{ number_format($lineItem->discount_percentage, 1) }}%
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td class="number">{{ number_format($afterDiscount, 2) }} {{ $invoice->currency }}</td>
+                    @endif
+                    <td class="number">{{ number_format($lineItem->tax_rate, 1) }}%</td>
+                    @if($invoice->invoice_type === '388')
+                        <td class="number">{{ number_format($taxAmount, 2) }} {{ $invoice->currency }}</td>
+                    @endif
+                    <td class="number">{{ number_format($lineItem->total_with_tax ?? ($afterDiscount + $taxAmount), 2) }} {{ $invoice->currency }}</td>
                 </tr>
                 @endforeach
             @else
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 20px; color: #666;">
+                    <td colspan="{{ $invoice->invoice_type === '388' ? '10' : '6' }}" style="text-align: center; padding: 20px; color: #666;">
                         No items found for this invoice
                     </td>
                 </tr>
@@ -249,32 +297,101 @@
 
     <div class="totals">
         <table>
-            <tr>
-                @if($invoice->invoice_type === '383')
-                    <td class="total-label">Return Subtotal / المجموع الفرعي للإرجاع:</td>
-                @elseif($invoice->invoice_type === '381')
-                    <td class="total-label">Additional Charges Subtotal / مجموع الرسوم الإضافية:</td>
+            @if($invoice->invoice_type === '388')
+                @php
+                    // Calculate totals from database line items for accuracy
+                    $calculatedSubtotalBeforeDiscount = 0;
+                    $calculatedLineDiscounts = 0;
+                    $calculatedSubtotalAfterDiscount = 0;
+                    $calculatedTaxAmount = 0;
+                    $calculatedTotal = 0;
+                    
+                    if($invoice->lineItems && $invoice->lineItems->count() > 0) {
+                        foreach($invoice->lineItems as $lineItem) {
+                            $lineSubtotal = $lineItem->quantity * $lineItem->unit_price;
+                            $discountAmount = $lineItem->discount_amount ?? 0;
+                            $afterDiscount = $lineSubtotal - $discountAmount;
+                            $taxAmount = $afterDiscount * ($lineItem->tax_rate / 100);
+                            
+                            $calculatedSubtotalBeforeDiscount += $lineSubtotal;
+                            $calculatedLineDiscounts += $discountAmount;
+                            $calculatedSubtotalAfterDiscount += $afterDiscount;
+                            $calculatedTaxAmount += $taxAmount;
+                            $calculatedTotal += $afterDiscount + $taxAmount;
+                        }
+                    }
+                    
+                    // Apply overall discount if any
+                    $overallDiscount = $invoice->overall_discount_amount ?? 0;
+                    $finalTotal = $calculatedTotal - $overallDiscount;
+                @endphp
+                
+                @if($calculatedLineDiscounts > 0 || $overallDiscount > 0)
+                <tr>
+                    <td class="total-label">Subtotal Before Discounts / المجموع قبل الخصومات:</td>
+                    <td class="number">{{ number_format($calculatedSubtotalBeforeDiscount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                @if($calculatedLineDiscounts > 0)
+                <tr>
+                    <td class="total-label">Line Discounts / خصومات البنود:</td>
+                    <td class="number">-{{ number_format($calculatedLineDiscounts, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                @endif
+                @if($overallDiscount > 0)
+                <tr>
+                    <td class="total-label">
+                        @if($invoice->overall_discount_percentage > 0)
+                            Invoice Discount ({{ number_format($invoice->overall_discount_percentage, 1) }}%) / خصم الفاتورة:
+                        @else
+                            Invoice Discount / خصم الفاتورة:
+                        @endif
+                    </td>
+                    <td class="number">-{{ number_format($overallDiscount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                @endif
+                <tr>
+                    <td class="total-label">Subtotal After Discounts / المجموع بعد الخصومات:</td>
+                    <td class="number">{{ number_format($calculatedSubtotalAfterDiscount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
                 @else
+                <tr>
                     <td class="total-label">Subtotal / المجموع الفرعي:</td>
+                    <td class="number">{{ number_format($calculatedSubtotalAfterDiscount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
                 @endif
-                <td class="number">{{ number_format($invoice->subtotal, 2) }} {{ $invoice->currency }}</td>
-            </tr>
-            <tr>
-                <td class="total-label">Tax Amount / مبلغ الضريبة:</td>
-                <td class="number">{{ number_format($invoice->tax_amount, 2) }} {{ $invoice->currency }}</td>
-            </tr>
-            <tr class="final-total">
-                @if($invoice->invoice_type === '383')
-                    <td class="total-label" style="color: #dc3545;">Total Return Amount / إجمالي مبلغ الإرجاع:</td>
-                    <td class="number" style="color: #dc3545;">-{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</td>
-                @elseif($invoice->invoice_type === '381')
-                    <td class="total-label" style="color: #198754;">Total Additional Amount / إجمالي المبلغ الإضافي:</td>
-                    <td class="number" style="color: #198754;">+{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</td>
-                @else
+                <tr>
+                    <td class="total-label">Tax Amount / مبلغ الضريبة:</td>
+                    <td class="number">{{ number_format($calculatedTaxAmount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                <tr class="final-total">
                     <td class="total-label">Total Amount / المبلغ الإجمالي:</td>
-                    <td class="number">{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</td>
-                @endif
-            </tr>
+                    <td class="number">{{ number_format($finalTotal, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+            @else
+                <tr>
+                    @if($invoice->invoice_type === '383')
+                        <td class="total-label">Return Subtotal / المجموع الفرعي للإرجاع:</td>
+                    @elseif($invoice->invoice_type === '381')
+                        <td class="total-label">Additional Charges Subtotal / مجموع الرسوم الإضافية:</td>
+                    @else
+                        <td class="total-label">Subtotal / المجموع الفرعي:</td>
+                    @endif
+                    <td class="number">{{ number_format($invoice->subtotal, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                <tr>
+                    <td class="total-label">Tax Amount / مبلغ الضريبة:</td>
+                    <td class="number">{{ number_format($invoice->tax_amount, 2) }} {{ $invoice->currency }}</td>
+                </tr>
+                <tr class="final-total">
+                    @if($invoice->invoice_type === '383')
+                        <td class="total-label" style="color: #dc3545;">Total Return Amount / إجمالي مبلغ الإرجاع:</td>
+                        <td class="number" style="color: #dc3545;">-{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</td>
+                    @elseif($invoice->invoice_type === '381')
+                        <td class="total-label" style="color: #198754;">Total Additional Amount / إجمالي المبلغ الإضافي:</td>
+                        <td class="number" style="color: #198754;">+{{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</td>
+                    @endif
+                </tr>
+            @endif
         </table>
     </div>
 

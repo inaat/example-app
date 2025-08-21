@@ -52,12 +52,14 @@ class CompanyZatcaOnboarding extends Model
         'status',
         'registration_date',
         'effective_date',
+        'certificate_expiry_date',
         'notes'
     ];
 
     protected $casts = [
         'registration_date' => 'datetime',
         'effective_date' => 'datetime',
+        'certificate_expiry_date' => 'datetime',
     ];
 
     protected $attributes = [
@@ -180,5 +182,42 @@ class CompanyZatcaOnboarding extends Model
             'pending' => 'secondary',
             default => 'secondary'
         };
+    }
+
+    /**
+     * Check if certificate is expired
+     */
+    public function isCertificateExpired()
+    {
+        if (!$this->certificate_expiry_date) {
+            return false;
+        }
+        
+        return now()->greaterThan($this->certificate_expiry_date);
+    }
+
+    /**
+     * Check if certificate is expiring soon (within 30 days)
+     */
+    public function isCertificateExpiringSoon($days = 30)
+    {
+        if (!$this->certificate_expiry_date) {
+            return false;
+        }
+        
+        return now()->addDays($days)->greaterThan($this->certificate_expiry_date) && 
+               !$this->isCertificateExpired();
+    }
+
+    /**
+     * Get days until certificate expiry
+     */
+    public function getDaysUntilExpiry()
+    {
+        if (!$this->certificate_expiry_date) {
+            return null;
+        }
+        
+        return now()->diffInDays($this->certificate_expiry_date, false);
     }
 }

@@ -12,6 +12,7 @@ class CompanyInvoice extends Model
 
     protected $fillable = [
         'company_zatca_onboarding_id',
+        'customer_id',
         'invoice_number',
         'uuid',
         'invoice_type',
@@ -22,14 +23,13 @@ class CompanyInvoice extends Model
         'icv',
         'previous_invoice_hash',
         'current_hash',
-        'seller_info',
-        'buyer_info',
         'subtotal',
         'tax_amount',
         'discount_amount',
+        'overall_discount_amount',
+        'overall_discount_percentage',
         'total_amount',
         'currency',
-        'line_items',
         'invoice_xml',
         'signed_xml',
         'qr_code',
@@ -49,9 +49,6 @@ class CompanyInvoice extends Model
         'due_date' => 'date',
         'submitted_at' => 'datetime',
         'cleared_at' => 'datetime',
-        'seller_info' => 'array',
-        'buyer_info' => 'array',
-        'line_items' => 'array',
         'zatca_response' => 'array',
         'subtotal' => 'decimal:2',
         'tax_amount' => 'decimal:2',
@@ -75,6 +72,14 @@ class CompanyInvoice extends Model
     public function company()
     {
         return $this->belongsTo(CompanyZatcaOnboarding::class, 'company_zatca_onboarding_id');
+    }
+
+    /**
+     * Get the customer for this invoice
+     */
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     /**

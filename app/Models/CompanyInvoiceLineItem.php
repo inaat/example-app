@@ -14,6 +14,8 @@ class CompanyInvoiceLineItem extends Model
         'product_id',
         'quantity',
         'unit_price',
+        'discount_amount',
+        'discount_percentage',
         'tax_rate',
         'line_total',
         'tax_amount',
@@ -23,6 +25,8 @@ class CompanyInvoiceLineItem extends Model
     protected $casts = [
         'quantity' => 'decimal:3',
         'unit_price' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'discount_percentage' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'line_total' => 'decimal:2',
         'tax_amount' => 'decimal:2',

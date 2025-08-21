@@ -85,6 +85,13 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" 
+                               href="{{ route('customers.index') }}">
+                                <i class="fas fa-users me-2"></i>
+                                Customers
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('zatca.company.invoices.*') ? 'active' : '' }}" 
                                href="{{ route('zatca.company.invoices.index') }}">
                                 <i class="fas fa-file-invoice-dollar me-2"></i>

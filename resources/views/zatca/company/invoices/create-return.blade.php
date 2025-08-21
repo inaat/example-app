@@ -11,7 +11,7 @@
                 <h5 class="card-title mb-0">Return Invoice Information</h5>
             </div>
             <div class="card-body">
-                <form action="{{ route('zatca.company.invoices.store') }}" method="POST" id="returnForm">
+                <form action="{{ route('zatca.company.returns.store') }}" method="POST" id="returnForm">
                     @csrf
                     
                     <!-- Return Information Alert -->
@@ -33,7 +33,7 @@
                                     <p><strong>Total Amount:</strong> {{ number_format($invoice->total_amount, 2) }} {{ $invoice->currency }}</p>
                                 </div>
                                 <div class="col-md-6">
-                                    <p><strong>Customer:</strong> {{ $invoice->buyer_info['name'] ?? 'No customer' }}</p>
+                                    <p><strong>Customer:</strong> {{ $invoice->customer->name ?? 'No customer' }}</p>
                                     <p><strong>Company:</strong> {{ $invoice->company->organization_name }}</p>
                                     <p><strong>Type:</strong> {{ $invoice->getInvoiceTypeName() }} ({{ $invoice->invoice_subtype === '01' ? 'Standard' : 'Simplified' }})</p>
                                 </div>
@@ -111,12 +111,55 @@
                         @enderror
                     </div>
 
-                    <!-- Copy customer information from original invoice -->
-                    @if($invoice->buyer_info)
-                    <input type="hidden" name="buyer_name" value="{{ $invoice->buyer_info['name'] }}">
-                    <input type="hidden" name="buyer_vat" value="{{ $invoice->buyer_info['vat_number'] ?? '' }}">
-                    <input type="hidden" name="buyer_address" value="{{ $invoice->buyer_info['address'] ?? '' }}">
-                    @endif
+                    <!-- Customer Selection -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Customer Information / معلومات العميل</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="customer_id" class="form-label">Select Customer *</label>
+                                        <select class="form-select @error('customer_id') is-invalid @enderror" 
+                                                id="customer_id" name="customer_id" required>
+                                            <option value="">Choose a customer...</option>
+                                            @foreach($customers as $customer)
+                                                <option value="{{ $customer->id }}" 
+                                                        data-name="{{ $customer->name }}"
+                                                        data-vat="{{ $customer->vat_number }}"
+                                                        data-email="{{ $customer->email }}"
+                                                        data-phone="{{ $customer->phone }}"
+                                                        data-address="{{ $customer->full_address }}"
+                                                        {{ old('customer_id', $invoice->customer_id) == $customer->id ? 'selected' : '' }}>
+                                                    {{ $customer->name }} @if($customer->vat_number) ({{ $customer->vat_number }}) @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('customer_id')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                        <div class="form-text">Return will be processed for the selected customer.</div>
+                                    </div>
+
+                                    <!-- Customer Details Display -->
+                                    <div id="customerDetails" style="display: none;">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p><strong>Customer Name:</strong> <span id="selectedCustomerName"></span></p>
+                                                <p><strong>VAT Number:</strong> <span id="selectedCustomerVat"></span></p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Email:</strong> <span id="selectedCustomerEmail"></span></p>
+                                                <p><strong>Phone:</strong> <span id="selectedCustomerPhone"></span></p>
+                                            </div>
+                                        </div>
+                                        <p><strong>Address:</strong> <span id="selectedCustomerAddress"></span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <input type="hidden" name="currency" value="{{ $invoice->currency }}">
 
@@ -131,6 +174,7 @@
                                     <label class="form-label">Item Name *</label>
                                     <input type="text" class="form-control" name="line_items[{{ $index }}][name]" 
                                            value="{{ $item['name'] }}" required readonly>
+                                    <input type="hidden" name="line_items[{{ $index }}][product_id]" value="{{ $item['product_id'] }}">
                                 </div>
                                 <div class="col-md-2 mb-2">
                                     <label class="form-label">Original Qty</label>
@@ -222,11 +266,33 @@ function calculateTotals() {
     document.getElementById('totalAmount').textContent = (subtotal + totalTax).toFixed(2);
 }
 
+function updateCustomerDetails() {
+    const customerSelect = document.getElementById('customer_id');
+    const customerDetails = document.getElementById('customerDetails');
+    
+    if (customerSelect.value) {
+        const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+        
+        document.getElementById('selectedCustomerName').textContent = selectedOption.dataset.name || '';
+        document.getElementById('selectedCustomerVat').textContent = selectedOption.dataset.vat || 'N/A';
+        document.getElementById('selectedCustomerEmail').textContent = selectedOption.dataset.email || 'N/A';
+        document.getElementById('selectedCustomerPhone').textContent = selectedOption.dataset.phone || 'N/A';
+        document.getElementById('selectedCustomerAddress').textContent = selectedOption.dataset.address || 'N/A';
+        
+        customerDetails.style.display = 'block';
+    } else {
+        customerDetails.style.display = 'none';
+    }
+}
+
 // Initialize event listeners
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.quantity, .item-checkbox').forEach(input => {
         input.addEventListener('change', calculateTotals);
     });
+    
+    // Customer selection change handler
+    document.getElementById('customer_id').addEventListener('change', updateCustomerDetails);
     
     // Initially disable all quantity inputs
     document.querySelectorAll('.quantity').forEach(input => {
@@ -245,6 +311,9 @@ document.addEventListener('DOMContentLoaded', function() {
             calculateTotals();
         });
     });
+    
+    // Initialize customer details on page load
+    updateCustomerDetails();
 });
 </script>
 @endsection
